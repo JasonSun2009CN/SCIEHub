@@ -1,0 +1,68 @@
+import fs from 'node:fs';
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
+import staticPlugin from '@fastify/static';
+import { config } from './config.js';
+import { authOnRequest } from './auth.js';
+import { closeDb, seedIfEmpty } from './db.js';
+import { registerAuthRoutes } from './routes/auth.js';
+import { registerResourceRoutes } from './routes/resources.js';
+import { registerGroupRoutes } from './routes/groups.js';
+import { registerUserRoutes } from './routes/users.js';
+import { registerHomeRoutes } from './routes/home.js';
+
+const app = Fastify({ logger: true, trustProxy: true });
+
+await app.register(cors, { origin: true });
+await app.register(multipart, {
+  limits: { fileSize: 50 * 1024 * 1024, files: 4 },
+});
+
+app.addHook('onRequest', authOnRequest);
+
+await registerAuthRoutes(app);
+await registerResourceRoutes(app);
+await registerGroupRoutes(app);
+await registerUserRoutes(app);
+await registerHomeRoutes(app);
+
+// Uploaded files are served from /uploads/*. decorateReply is off because the
+// SPA static registration below owns the reply.sendFile decorator.
+await app.register(staticPlugin, { root: config.uploadDir, prefix: '/uploads/', decorateReply: false });
+
+// In production, serve the built frontend and fall back to index.html so the
+// React Router history-mode routes stay reachable on refresh / deep links.
+const hasWebBuild = fs.existsSync(config.webDist);
+if (hasWebBuild) {
+  await app.register(staticPlugin, { root: config.webDist });
+}
+
+app.setNotFoundHandler((req, reply) => {
+  if (req.url.startsWith('/api/') || req.url.startsWith('/uploads/')) {
+    return reply.code(404).send({ error: 'Not found' });
+  }
+  if (hasWebBuild) {
+    return reply.sendFile('index.html');
+  }
+  return reply.code(404).send({ error: `Not found (build the frontend with npm run build to serve it here)` });
+});
+
+seedIfEmpty();
+
+const handleShutdown = async (signal: string) => {
+  app.log.info(`Received ${signal}, shutting down`);
+  await app.close();
+  closeDb();
+  process.exit(0);
+};
+process.on('SIGINT', () => void handleShutdown('SIGINT'));
+process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
+
+try {
+  await app.listen({ port: config.port, host: config.host });
+  app.log.info(`SCIEHub ready — API on http://localhost:${config.port}`);
+} catch (err) {
+  app.log.error(err);
+  process.exit(1);
+}
