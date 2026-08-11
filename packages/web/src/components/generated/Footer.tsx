@@ -4,8 +4,9 @@ import { FaGithub, FaGraduationCap, FaInstagram, FaLinkedinIn, FaTwitter } from 
 const PLATFORM_LINKS = [
   { to: '/feed', label: 'Resources' },
   { to: '/groups', label: 'Groups' },
+  { to: '/leaderboard', label: 'Leaderboard' },
+  { to: '/conduct', label: 'Community guidelines' },
   { to: '/upload', label: 'Upload' },
-  { to: '/auth', label: 'Sign in' },
 ];
 
 const SOCIALS = [
@@ -49,7 +50,7 @@ export function Footer() {
             <h3 className="text-sm font-semibold">About</h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li><span className="text-muted-foreground">Built for students, by students.</span></li>
-              <li><span className="text-muted-foreground">IB · A-Level · AP · IGCSE</span></li>
+              <li><span className="text-muted-foreground">IB · AS/A-Level · AP · IGCSE</span></li>
             </ul>
           </div>
 

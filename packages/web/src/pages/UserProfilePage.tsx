@@ -1,13 +1,13 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FaCalendarAlt, FaFolder, FaUsers } from 'react-icons/fa';
-import type { Group, Resource, User } from '@sciehub/shared';
+import { FaBook, FaCalendarAlt, FaDownload, FaUsers } from 'react-icons/fa';
+import { formatBytes, type Group, type Repository, type User } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserAvatar } from '@/components/generated/UserAvatar';
-import { ResourceCard } from '@/components/generated/ResourceCard';
+import { RepositoryCard } from '@/components/generated/RepositoryCard';
 import { GroupCard } from '@/components/generated/GroupCard';
 import { formatDate, formatNumber } from '@/lib/utils';
 
@@ -20,15 +20,15 @@ export function UserProfilePage() {
     enabled: Boolean(username),
   });
 
-  const { data: uploads } = useQuery({
-    queryKey: ['userUploads', username],
-    queryFn: () => api<{ items: Resource[] }>(`/users/${username}/resources`),
+  const { data: repos } = useQuery({
+    queryKey: ['userRepos', username],
+    queryFn: () => api<{ items: Repository[] }>(`/users/${username}/repos`),
     enabled: Boolean(username),
   });
 
   const { data: favorites } = useQuery({
     queryKey: ['userFavorites', username],
-    queryFn: () => api<{ items: Resource[] }>(`/users/${username}/favorites`),
+    queryFn: () => api<{ items: Repository[] }>(`/users/${username}/favorites`),
     enabled: Boolean(username),
   });
 
@@ -65,9 +65,10 @@ export function UserProfilePage() {
   }
 
   const stats = [
-    { Icon: FaFolder, label: 'Uploads', value: user.uploadCount },
+    { Icon: FaBook, label: 'Repositories', value: user.repoCount },
+    { Icon: FaBook, label: 'Files shared', value: user.fileCount },
     { Icon: FaUsers, label: 'Groups', value: user.groupCount },
-    { label: 'Total downloads', value: formatNumber(user.totalDownloads) },
+    { Icon: FaDownload, label: 'Total downloads', value: formatNumber(user.totalDownloads) },
   ];
 
   return (
@@ -80,14 +81,21 @@ export function UserProfilePage() {
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 text-2xl font-bold">
               {user.nickname}
-              {user.nickname === user.username ? null : <span className="text-base font-normal text-muted-foreground">@{user.username}</span>}
+              {user.nickname === user.username ? null : (
+                <span className="text-base font-normal text-muted-foreground">@{user.username}</span>
+              )}
             </h1>
             {user.bio && <p className="mt-1 max-w-xl text-sm text-muted-foreground">{user.bio}</p>}
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <FaCalendarAlt className="h-3.5 w-3.5" /> Joined {formatDate(user.createdAt)}
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <FaCalendarAlt className="h-3.5 w-3.5" /> Joined {formatDate(user.createdAt)}
+              </span>
+              <span className="flex items-center gap-1">
+                <FaBook className="h-3.5 w-3.5" /> {formatBytes(user.totalBytes)} shared
+              </span>
             </div>
           </div>
-          <div className="flex gap-6 text-center">
+          <div className="flex flex-wrap gap-6 text-center">
             {stats.map(({ label, value }) => (
               <div key={label}>
                 <div className="text-xl font-bold text-accent">{value}</div>
@@ -98,10 +106,10 @@ export function UserProfilePage() {
         </div>
       </div>
 
-      <Tabs defaultValue="uploads" className="mt-6">
+      <Tabs defaultValue="repos" className="mt-6">
         <TabsList>
-          <TabsTrigger value="uploads">
-            <FaFolder className="h-3.5 w-3.5" /> Uploads
+          <TabsTrigger value="repos">
+            <FaBook className="h-3.5 w-3.5" /> Repositories
           </TabsTrigger>
           <TabsTrigger value="favorites">Favorites</TabsTrigger>
           <TabsTrigger value="groups">
@@ -109,15 +117,15 @@ export function UserProfilePage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="uploads">
-          {uploads?.items?.length ? (
+        <TabsContent value="repos">
+          {repos?.items?.length ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {uploads.items.map((r, i) => (
-                <ResourceCard key={r.id} resource={r} index={i} />
+              {repos.items.map((r, i) => (
+                <RepositoryCard key={r.id} repo={r} index={i} />
               ))}
             </div>
           ) : (
-            <Empty text="No uploaded resources yet." />
+            <Empty text="No repositories yet." />
           )}
         </TabsContent>
 
@@ -125,7 +133,7 @@ export function UserProfilePage() {
           {favorites?.items?.length ? (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {favorites.items.map((r, i) => (
-                <ResourceCard key={r.id} resource={r} index={i} />
+                <RepositoryCard key={r.id} repo={r} index={i} />
               ))}
             </div>
           ) : (

@@ -10,32 +10,49 @@ export interface User {
   avatarUrl: string;
   bio: string;
   createdAt: string;
-  uploadCount: number;
+  repoCount: number;
+  fileCount: number;
   groupCount: number;
   totalDownloads: number;
+  totalBytes: number;
 }
 
-export interface Resource {
+/** A user-owned repository of study files (GitHub-style). */
+export interface Repository {
   id: string;
-  title: string;
+  name: string;
   description: string;
-  fileType: FileType;
-  fileSize: string;
-  /** Server-relative path, e.g. /uploads/xxx.pdf */
-  filePath: string;
-  uploaderId: string;
-  uploader: User;
-  groupId: string;
-  groupName: string;
+  ownerId: string;
+  owner: User;
   categoryId: string;
   categoryName: string;
   tags: string[];
+  fileCount: number;
+  totalBytes: number;
   downloadCount: number;
   viewCount: number;
   commentCount: number;
   favoriteCount: number;
+  groupIds: string[];
+  groupNames: string[];
   createdAt: string;
   isFavorite?: boolean;
+  isOwner?: boolean;
+}
+
+/** A single file inside a repository. */
+export interface RepoFile {
+  id: string;
+  repoId: string;
+  title: string;
+  description: string;
+  fileType: FileType;
+  fileSize: string;
+  fileBytes: number;
+  filePath: string;
+  downloadCount: number;
+  viewCount: number;
+  createdAt: string;
 }
 
 export interface Group {
@@ -47,10 +64,12 @@ export interface Group {
   creatorId: string;
   creator: User;
   memberCount: number;
-  resourceCount: number;
+  repoCount: number;
   createdAt: string;
   isMember?: boolean;
   isAdmin?: boolean;
+  /** Current user's membership-request status, when they asked to join. */
+  joinStatus?: 'pending' | 'rejected' | null;
 }
 
 export interface GroupMember {
@@ -60,14 +79,52 @@ export interface GroupMember {
   joinedAt: string;
 }
 
+export interface GroupRequest {
+  id: string;
+  groupId: string;
+  userId: string;
+  user: User;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
 export interface Comment {
   id: string;
-  resourceId: string;
+  repoId: string;
   userId: string;
   user: User;
   content: string;
   createdAt: string;
 }
+
+export interface LeaderboardEntry {
+  user: User;
+  repoCount: number;
+  fileCount: number;
+  totalBytes: number;
+  totalDownloads: number;
+}
+
+export type ReportTarget = 'repo' | 'comment';
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  targetType: ReportTarget;
+  targetId: string;
+  reason: string;
+  createdAt: string;
+  status: 'open' | 'resolved';
+}
+
+export const REPORT_REASONS = [
+  { id: 'harassment', label: 'Harassment or abuse' },
+  { id: 'copyright', label: 'Copyright violation' },
+  { id: 'plagiarism', label: 'Plagiarism' },
+  { id: 'spam', label: 'Spam or misleading' },
+  { id: 'inappropriate', label: 'Inappropriate content' },
+  { id: 'other', label: 'Other' },
+] as const;
 
 export interface Category {
   id: string;
@@ -92,16 +149,17 @@ export function categoryName(id: string): string {
   return CATEGORIES.find((c) => c.id === id)?.name ?? 'Other';
 }
 
-export type GroupSort = 'members' | 'resources' | 'recent';
-export type ResourceSort = 'recent' | 'popular' | 'views';
+export type GroupSort = 'members' | 'repos' | 'recent';
+export type RepoSort = 'recent' | 'popular' | 'views';
 
-export interface ResourceListResult {
-  items: Resource[];
+export interface RepoListResult {
+  items: Repository[];
   total: number;
 }
 
 export interface HomeStats {
-  resources: number;
+  repos: number;
+  files: number;
   groups: number;
   users: number;
   downloads: number;
@@ -109,13 +167,14 @@ export interface HomeStats {
 
 export interface HomeData {
   stats: HomeStats;
-  hotResources: Resource[];
+  hotRepos: Repository[];
   activeGroups: Group[];
-  recentUploads: Resource[];
+  recentRepos: Repository[];
+  topContributors: LeaderboardEntry[];
 }
 
 export interface SearchResult {
-  resources: Resource[];
+  repos: Repository[];
   groups: Group[];
 }
 
@@ -149,4 +208,12 @@ export function initials(name: string): string {
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
+}
+
+/** 43 bytes -> "43 B"; 1_500_000 -> "1.4 MB" */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }

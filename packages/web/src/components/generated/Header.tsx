@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { to: '/feed', label: 'Feed' },
   { to: '/groups', label: 'Groups' },
+  { to: '/leaderboard', label: 'Leaderboard' },
 ];
 
 export function Header() {

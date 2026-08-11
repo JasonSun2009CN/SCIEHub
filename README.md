@@ -2,7 +2,7 @@
 
 A GitHub-style study-materials sharing platform for international high school students (IB · A-Level · AP · IGCSE).
 
-**Share, Collaborate, Excel.** Upload notes and past papers, join subject study groups, search resources, comment, favorite, and download — all in a dark-first GitHub-inspired interface.
+**Share, Collaborate, Excel.** Create your own study repositories — each holding multiple files like a GitHub repo — share them into subject groups, compete on the community leaderboard, and download from classmates. Dark-first, GitHub-inspired interface.
 
 ## Tech stack
 
@@ -12,6 +12,17 @@ A GitHub-style study-materials sharing platform for international high school st
 | Backend | Node.js · Fastify · TypeScript · better-sqlite3 |
 | Auth | JWT + bcrypt (email/password) |
 | Repo | npm workspaces monorepo: `packages/web` + `packages/server` + `packages/shared` |
+
+## Features
+
+- **Repositories** — users create repos (name, description, category, tags) and upload multiple files into them, GitHub-style.
+- **Feed & search** — browse repositories with category filters, sorting (recent / most downloaded / most viewed) and full-text search.
+- **Study groups** — join groups by **requesting membership**; the group creator approves or rejects each request. Groups collect repositories shared into them.
+- **Sharing** — a repo owner can share a repository into any group they belong to (and remove it again).
+- **Leaderboard** — `/leaderboard` ranks contributors by number of files shared, showing total size alongside.
+- **Community guidelines** — `/conduct` sets the rules; **Report** buttons on every repository and comment store reports for review.
+- **Comments & favorites** per repository, per-file download counters, drag-and-drop multi-file uploads with progress.
+- **Dark/light themes** (dark default) driven by CSS-variable tokens.
 
 ## Getting started
 
@@ -29,17 +40,7 @@ npm run build        # builds shared → server → web
 npm start            # Fastify serves the built SPA + API on :4000
 ```
 
-Open http://localhost:4000. A blank database is created and seeded automatically on first boot.
-
-## Demo accounts
-
-| Role | Email | Password |
-| --- | --- | --- |
-| Member | `alice@sciehub.io` | `password123` |
-| Member | `bob@sciehub.io` | `password123` |
-| … | any `user@sciehub.io` / `password123` | (see seed data) |
-
-Register your own account from the **Sign in** page.
+Open http://localhost:4000. A blank database is created automatically on first boot — **no demo data is included**; register your own account from the **Sign in** page.
 
 ## Environment variables
 
@@ -56,8 +57,8 @@ Register your own account from the **Sign in** page.
 
 ```
 packages/
-├── shared/     # Domain types + shared constants (User, Resource, Group, categories…)
-├── server/     # Fastify API, SQLite schema/seed, JWT auth, uploads, static SPA hosting
+├── shared/     # Domain types + constants (Repository, RepoFile, User, categories, report reasons…)
+├── server/     # Fastify API, SQLite schema, JWT auth, uploads, static SPA hosting
 └── web/        # React SPA — pages, shadcn/ui components, theme system
 ```
 
@@ -65,19 +66,22 @@ packages/
 
 | Route | Page |
 | --- | --- |
-| `/` | Home — hero, trending resources, active groups |
-| `/feed` | Browse/search resources with filters + sorting |
-| `/resources/:id` | Resource detail — download, favorite, share, comments |
-| `/upload` | Drag-and-drop multi-file upload |
+| `/` | Home — hero, trending repos, top contributors, active groups |
+| `/feed` | Browse/search repositories with filters + sorting |
+| `/repos/:id` | Repository detail — files, comments, favorite, share, report |
+| `/upload` | Create a repository / add files to one you own |
 | `/groups` | Group directory + create-group dialog |
-| `/groups/:id` | Group detail — resources / members / settings (admin) |
-| `/users/:username` | Public profile — uploads / favorites / groups |
+| `/groups/:id` | Group detail — repositories / members (+ join requests) / settings (creator) |
+| `/users/:username` | Public profile — repositories / favorites / groups |
+| `/leaderboard` | Top contributors by files shared + total size |
+| `/conduct` | Community guidelines |
 | `/settings` | Profile, avatar, notification prefs, password |
 | `/auth` | Sign in / register |
 
 ## Notes
 
-- The dark theme is the default; a light theme is available via the header toggle. Both share the same CSS-variable tokens (`packages/web/src/index.css`).
-- React Router uses history mode — the Fastify server falls back to `index.html` so deep links and refreshes work in production.
+- Joining a group creates a **join request**; the group creator (admin) approves/rejects it. Admins cannot leave — they delete the group instead.
+- Reports (`reports` table) are stored for future moderation; there is no review UI yet.
 - Uploaded files live on the server disk; the database stores relative paths. Back up both `data/sciehub.db` and `data/uploads/`.
+- React Router uses history mode — the Fastify server falls back to `index.html` so deep links and refreshes work in production.
 - Architecture decisions are recorded in [`ADR.md`](./ADR.md); see [`ROADMAP.md`](./ROADMAP.md) and [`HANDOFF.md`](./HANDOFF.md) for status and handoff details.

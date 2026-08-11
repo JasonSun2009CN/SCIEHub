@@ -5,12 +5,13 @@ import multipart from '@fastify/multipart';
 import staticPlugin from '@fastify/static';
 import { config } from './config.js';
 import { authOnRequest } from './auth.js';
-import { closeDb, seedIfEmpty } from './db.js';
+import { closeDb } from './db.js';
 import { registerAuthRoutes } from './routes/auth.js';
-import { registerResourceRoutes } from './routes/resources.js';
+import { registerRepoRoutes } from './routes/repos.js';
 import { registerGroupRoutes } from './routes/groups.js';
 import { registerUserRoutes } from './routes/users.js';
 import { registerHomeRoutes } from './routes/home.js';
+import { registerReportRoutes } from './routes/reports.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 
@@ -22,10 +23,11 @@ await app.register(multipart, {
 app.addHook('onRequest', authOnRequest);
 
 await registerAuthRoutes(app);
-await registerResourceRoutes(app);
+await registerRepoRoutes(app);
 await registerGroupRoutes(app);
 await registerUserRoutes(app);
 await registerHomeRoutes(app);
+await registerReportRoutes(app);
 
 // Uploaded files are served from /uploads/*. decorateReply is off because the
 // SPA static registration below owns the reply.sendFile decorator.
@@ -47,8 +49,6 @@ app.setNotFoundHandler((req, reply) => {
   }
   return reply.code(404).send({ error: `Not found (build the frontend with npm run build to serve it here)` });
 });
-
-seedIfEmpty();
 
 const handleShutdown = async (signal: string) => {
   app.log.info(`Received ${signal}, shutting down`);

@@ -3,7 +3,7 @@ import {
   getUserByUsername,
   listFavorites,
   listGroupsByMember,
-  listResourcesByUploader,
+  listReposByOwner,
 } from '../db.js';
 
 export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
@@ -14,11 +14,11 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     return { user };
   });
 
-  app.get('/api/users/:username/resources', async (req, reply) => {
+  app.get('/api/users/:username/repos', async (req, reply) => {
     const { username } = req.params as { username: string };
     const user = getUserByUsername(username);
     if (!user) return reply.code(404).send({ error: 'User not found' });
-    return { items: listResourcesByUploader(username) };
+    return { items: listReposByOwner(user.id) };
   });
 
   app.get('/api/users/:username/favorites', async (req, reply) => {

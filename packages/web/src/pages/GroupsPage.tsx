@@ -228,7 +228,7 @@ export function GroupsPage() {
           <SelectContent>
             <SelectItem value="recent">Newest first</SelectItem>
             <SelectItem value="members">Most members</SelectItem>
-            <SelectItem value="resources">Most resources</SelectItem>
+            <SelectItem value="repos">Most repositories</SelectItem>
           </SelectContent>
         </Select>
         <span className="ml-auto text-sm text-muted-foreground">{total} group{total === 1 ? '' : 's'}</span>

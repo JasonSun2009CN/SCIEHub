@@ -1,41 +1,36 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  FaArrowRight,
-  FaFire,
-  FaSearch,
-  FaShareAlt,
-  FaUsers,
-} from 'react-icons/fa';
-import type { HomeData } from '@sciehub/shared';
+import { FaArrowRight, FaFire, FaSearch, FaShareAlt, FaTrophy, FaUsers } from 'react-icons/fa';
+import { formatBytes, type HomeData } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ResourceCard } from '@/components/generated/ResourceCard';
+import { RepositoryCard } from '@/components/generated/RepositoryCard';
 import { GroupCard } from '@/components/generated/GroupCard';
+import { UserAvatar } from '@/components/generated/UserAvatar';
 import { formatNumber } from '@/lib/utils';
 
 const FEATURES = [
   {
     Icon: FaShareAlt,
-    title: 'Share resources',
-    description: 'Upload notes, past papers and cheat sheets, neatly organised by subject for everyone to find.',
+    title: 'Share repositories',
+    description: 'Build your own study repository — multiple files, one organised home — and share it with classmates.',
   },
   {
     Icon: FaUsers,
     title: 'Study groups',
-    description: 'Join subject communities, follow your peers and keep everything in one place.',
+    description: 'Join subject communities, request membership and discover repositories shared by members.',
   },
   {
     Icon: FaSearch,
     title: 'Smart search',
-    description: 'Search across subjects and tags to find exactly the material you need, fast.',
+    description: 'Search across repositories, files and groups to find exactly the material you need, fast.',
   },
 ];
 
-function ResourceGridSkeleton() {
+function RepoGridSkeleton() {
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: 6 }).map((_, i) => (
@@ -48,11 +43,26 @@ function ResourceGridSkeleton() {
               <Skeleton className="h-3 w-2/3" />
             </div>
           </div>
-          <Skeleton className="h-3 w-1/2" />
           <div className="flex gap-4 border-t border-border pt-3">
             <Skeleton className="h-3 w-10" />
             <Skeleton className="h-3 w-10" />
             <Skeleton className="h-3 w-10" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContributorsSkeleton() {
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-surface p-5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3 w-1/3" />
+            <Skeleton className="h-3 w-1/2" />
           </div>
         </div>
       ))}
@@ -70,7 +80,7 @@ export function HomePage() {
     <div>
       <PageMeta
         title="Home"
-        description="SCIEHub — share study materials, join subject groups and excel. For international high school students."
+        description="SCIEHub — build study repositories, share materials, join subject groups and excel. For international high school students."
       />
 
       {/* Hero */}
@@ -85,23 +95,24 @@ export function HomePage() {
             </span>
           </h1>
           <p className="animate-fade-in-up mx-auto mt-6 max-w-xl text-lg text-muted-foreground" style={{ animationDelay: '160ms' }}>
-            Upload your notes and past papers, join subject study groups, and find the materials that help you get ahead.
+            Create your own study repositories, upload multiple files, and share them with your subject groups.
           </p>
           <div className="animate-fade-in-up mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: '240ms' }}>
             <Button size="lg" asChild>
               <Link to="/feed">
-                Explore resources <FaArrowRight className="h-4 w-4" />
+                Explore repositories <FaArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link to="/groups">Join a group</Link>
+              <Link to="/upload">Create a repository</Link>
             </Button>
           </div>
 
           {data && (
-            <div className="animate-fade-in-up mx-auto mt-14 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4" style={{ animationDelay: '320ms' }}>
+            <div className="animate-fade-in-up mx-auto mt-14 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-5" style={{ animationDelay: '320ms' }}>
               {[
-                { label: 'Resources', value: data.stats.resources },
+                { label: 'Repositories', value: data.stats.repos },
+                { label: 'Files', value: data.stats.files },
                 { label: 'Study groups', value: data.stats.groups },
                 { label: 'Students', value: data.stats.users },
                 { label: 'Downloads', value: data.stats.downloads },
@@ -116,50 +127,86 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Hot resources */}
+      {/* Trending repos */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FaFire className="h-5 w-5 text-warning" aria-hidden />
-            <h2 className="text-xl font-bold sm:text-2xl">Trending resources</h2>
+            <h2 className="text-xl font-bold sm:text-2xl">Trending repositories</h2>
           </div>
           <Link to="/feed" className="text-sm font-medium text-accent hover:underline">
             View all →
           </Link>
         </div>
         {isLoading || !data ? (
-          <ResourceGridSkeleton />
+          <RepoGridSkeleton />
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {data.hotResources.map((resource, i) => (
-              <ResourceCard key={resource.id} resource={resource} index={i} />
+            {data.hotRepos.map((repo, i) => (
+              <RepositoryCard key={repo.id} repo={repo} index={i} />
             ))}
           </div>
         )}
       </section>
 
-      {/* Active groups */}
+      {/* Top contributors */}
       <section className="border-y border-border bg-surface/40">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FaUsers className="h-5 w-5 text-accent" aria-hidden />
-              <h2 className="text-xl font-bold sm:text-2xl">Active study groups</h2>
+              <FaTrophy className="h-5 w-5 text-warning" aria-hidden />
+              <h2 className="text-xl font-bold sm:text-2xl">Top contributors</h2>
             </div>
-            <Link to="/groups" className="text-sm font-medium text-accent hover:underline">
-              View all →
+            <Link to="/leaderboard" className="text-sm font-medium text-accent hover:underline">
+              Full leaderboard →
             </Link>
           </div>
           {isLoading || !data ? (
-            <ResourceGridSkeleton />
+            <ContributorsSkeleton />
+          ) : data.topContributors.length === 0 ? (
+            <p className="rounded-lg border border-border bg-surface py-12 text-center text-sm text-muted-foreground">
+              No contributions yet — be the first to share!
+            </p>
           ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {data.activeGroups.map((group, i) => (
-                <GroupCard key={group.id} group={group} index={i} />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {data.topContributors.map((entry, i) => (
+                <div key={entry.user.id} className="animate-fade-in-up rounded-lg border border-border bg-surface p-5 text-center" style={{ animationDelay: `${i * 60}ms` }}>
+                  <div className="text-xs font-semibold text-muted-foreground">#{i + 1}</div>
+                  <div className="mt-2 flex justify-center">
+                    <UserAvatar nickname={entry.user.nickname} username={entry.user.username} avatarUrl={entry.user.avatarUrl} size="lg" />
+                  </div>
+                  <Link to={`/users/${entry.user.username}`} className="mt-2 block truncate text-sm font-semibold hover:text-accent">
+                    {entry.user.nickname}
+                  </Link>
+                  <div className="mt-1 text-sm font-bold text-accent">{entry.fileCount} files</div>
+                  <div className="text-xs text-muted-foreground">{formatBytes(entry.totalBytes)} shared</div>
+                </div>
               ))}
             </div>
           )}
         </div>
+      </section>
+
+      {/* Active groups */}
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FaUsers className="h-5 w-5 text-accent" aria-hidden />
+            <h2 className="text-xl font-bold sm:text-2xl">Active study groups</h2>
+          </div>
+          <Link to="/groups" className="text-sm font-medium text-accent hover:underline">
+            View all →
+          </Link>
+        </div>
+        {isLoading || !data ? (
+          <RepoGridSkeleton />
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {data.activeGroups.map((group, i) => (
+              <GroupCard key={group.id} group={group} index={i} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Features */}
@@ -189,14 +236,14 @@ export function HomePage() {
           <div className="relative">
             <h2 className="text-2xl font-bold sm:text-3xl">Ready to share what you know?</h2>
             <p className="mx-auto mt-3 max-w-lg text-muted-foreground">
-              Join SCIEHub today and help your classmates — every upload makes the whole community stronger.
+              Create a repository, upload your notes, and share it with your study groups. Every contribution makes the community stronger.
             </p>
             <div className="mt-6 flex justify-center gap-3">
               <Button size="lg" asChild>
                 <Link to="/auth">Get started</Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link to="/upload">Upload a resource</Link>
+                <Link to="/upload">Create a repository</Link>
               </Button>
             </div>
           </div>

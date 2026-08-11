@@ -3,14 +3,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FaArrowLeft,
-  FaFolder,
+  FaBook,
+  FaCheck,
   FaSignOutAlt,
   FaSpinner,
   FaTrash,
+  FaUserClock,
   FaUserPlus,
   FaUsers,
 } from 'react-icons/fa';
-import { CATEGORIES, type Group, type GroupMember, type Resource } from '@sciehub/shared';
+import { CATEGORIES, type Group, type GroupMember, type GroupRequest, type Repository } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
@@ -30,7 +32,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { UserAvatar } from '@/components/generated/UserAvatar';
-import { ResourceCard } from '@/components/generated/ResourceCard';
+import { RepositoryCard } from '@/components/generated/RepositoryCard';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { formatDate, formatNumber, timeAgo } from '@/lib/utils';
@@ -48,22 +50,34 @@ export function GroupDetailPage() {
     enabled: Boolean(id),
   });
 
+  const { data: reposData } = useQuery({
+    queryKey: ['groupRepos', id],
+    queryFn: () => api<{ items: Repository[] }>(`/groups/${id}/repos`),
+    enabled: Boolean(id),
+  });
+
   const { data: membersData } = useQuery({
     queryKey: ['groupMembers', id],
     queryFn: () => api<{ items: GroupMember[] }>(`/groups/${id}/members`),
     enabled: Boolean(id),
   });
 
-  const { data: resourcesData } = useQuery({
-    queryKey: ['groupResources', id],
-    queryFn: () => api<{ items: Resource[] }>(`/groups/${id}/resources`),
-    enabled: Boolean(id),
+  const group = data?.group;
+  const isAdmin = Boolean(group?.isAdmin);
+
+  const { data: membersRequests } = useQuery({
+    queryKey: ['groupRequests', id],
+    queryFn: () => api<{ items: GroupRequest[] }>(`/groups/${id}/requests`),
+    enabled: Boolean(id) && isAdmin,
   });
+
+  const pendingCount = (membersRequests?.items ?? []).filter((r) => r.status === 'pending').length;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['group', id] });
+    queryClient.invalidateQueries({ queryKey: ['groupRepos', id] });
     queryClient.invalidateQueries({ queryKey: ['groupMembers', id] });
-    queryClient.invalidateQueries({ queryKey: ['groupResources', id] });
+    queryClient.invalidateQueries({ queryKey: ['groupRequests', id] });
     queryClient.invalidateQueries({ queryKey: ['groups'] });
     queryClient.invalidateQueries({ queryKey: ['myGroups'] });
   };
@@ -72,9 +86,9 @@ export function GroupDetailPage() {
     mutationFn: () => api<{ group: Group }>(`/groups/${id}/join`, { method: 'POST' }),
     onSuccess: () => {
       invalidate();
-      toast('Joined the group', 'success');
+      toast('Request sent — the creator will review it', 'success');
     },
-    onError: (err) => toast(err instanceof Error ? err.message : 'Could not join', 'error'),
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not request to join', 'error'),
   });
 
   const leaveMutation = useMutation({
@@ -86,9 +100,17 @@ export function GroupDetailPage() {
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not leave', 'error'),
   });
 
+  const decideMutation = useMutation({
+    mutationFn: ({ requestId, approve }: { requestId: string; approve: boolean }) =>
+      api(`/groups/${id}/requests/${requestId}/${approve ? 'approve' : 'reject'}`, { method: 'POST' }),
+    onSuccess: (_data, vars) => {
+      invalidate();
+      toast(vars.approve ? 'Request approved' : 'Request rejected', vars.approve ? 'success' : 'info');
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not update request', 'error'),
+  });
+
   // Settings (admin only)
-  const group = data?.group;
-  const isAdmin = Boolean(group?.isAdmin);
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -154,6 +176,22 @@ export function GroupDetailPage() {
     );
   }
 
+  const joinButton = group.isMember ? (
+    <Button variant="outline" onClick={onJoinToggle} disabled={leaveMutation.isPending}>
+      {leaveMutation.isPending ? <FaSpinner className="h-4 w-4 animate-spin" /> : <FaSignOutAlt className="h-4 w-4" />}
+      Leave
+    </Button>
+  ) : group.joinStatus === 'pending' ? (
+    <Button variant="secondary" disabled>
+      <FaUserClock className="h-4 w-4" /> Request pending
+    </Button>
+  ) : (
+    <Button onClick={onJoinToggle} disabled={joinMutation.isPending}>
+      {joinMutation.isPending ? <FaSpinner className="h-4 w-4 animate-spin" /> : <FaUserPlus className="h-4 w-4" />}
+      Request to join
+    </Button>
+  );
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <PageMeta title={group.name} description={group.description} />
@@ -180,25 +218,13 @@ export function GroupDetailPage() {
                   <FaUsers className="h-4 w-4 text-accent" /> {formatNumber(group.memberCount)} members
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <FaFolder className="h-4 w-4 text-accent" /> {formatNumber(group.resourceCount)} resources
+                  <FaBook className="h-4 w-4 text-accent" /> {formatNumber(group.repoCount)} repositories
                 </span>
                 <span>Created {timeAgo(group.createdAt)}</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {group.isMember ? (
-              <Button variant="outline" onClick={onJoinToggle} disabled={leaveMutation.isPending}>
-                {leaveMutation.isPending ? <FaSpinner className="h-4 w-4 animate-spin" /> : <FaSignOutAlt className="h-4 w-4" />}
-                Leave
-              </Button>
-            ) : (
-              <Button onClick={onJoinToggle} disabled={joinMutation.isPending}>
-                {joinMutation.isPending ? <FaSpinner className="h-4 w-4 animate-spin" /> : <FaUserPlus className="h-4 w-4" />}
-                Join group
-              </Button>
-            )}
-          </div>
+          <div className="flex items-center gap-2">{joinButton}</div>
         </div>
 
         <div className="mt-5 flex items-center gap-2 border-t border-border pt-4">
@@ -211,27 +237,32 @@ export function GroupDetailPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="resources" className="mt-6">
+      <Tabs defaultValue="repos" className="mt-6">
         <TabsList>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="repos">Repositories</TabsTrigger>
+          <TabsTrigger value="members">
+            Members
+            {isAdmin && pendingCount > 0 && (
+              <Badge variant="warning" className="ml-1">{pendingCount}</Badge>
+            )}
+          </TabsTrigger>
           {isAdmin && <TabsTrigger value="settings">Settings</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="resources">
-          {resourcesData?.items?.length ? (
+        <TabsContent value="repos">
+          {reposData?.items?.length ? (
             <div className="grid gap-5 sm:grid-cols-2">
-              {resourcesData.items.map((r, i) => (
-                <ResourceCard key={r.id} resource={r} index={i} showGroup={false} />
+              {reposData.items.map((r, i) => (
+                <RepositoryCard key={r.id} repo={r} index={i} showGroups={false} />
               ))}
             </div>
           ) : (
             <div className="rounded-lg border border-border bg-surface py-16 text-center text-sm text-muted-foreground">
-              No resources shared here yet.
+              No repositories shared here yet.
               {group.isMember && (
                 <div className="mt-3">
                   <Button asChild size="sm">
-                    <Link to="/upload">Upload one</Link>
+                    <Link to="/upload">Share a repository</Link>
                   </Button>
                 </div>
               )}
@@ -240,6 +271,46 @@ export function GroupDetailPage() {
         </TabsContent>
 
         <TabsContent value="members">
+          {/* Pending requests (admin only) */}
+          {isAdmin && pendingCount > 0 && (
+            <div className="mb-6 rounded-lg border border-border bg-surface p-5">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <FaUserClock className="h-4 w-4 text-warning" /> Join requests ({pendingCount})
+              </h3>
+              <ul className="mt-3 space-y-3">
+                {(membersRequests?.items ?? [])
+                  .filter((r) => r.status === 'pending')
+                  .map((r) => (
+                    <li key={r.id} className="flex items-center gap-3 rounded-md border border-border p-3">
+                      <UserAvatar nickname={r.user.nickname} username={r.user.username} avatarUrl={r.user.avatarUrl} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <Link to={`/users/${r.user.username}`} className="block truncate text-sm font-medium hover:text-accent">
+                          {r.user.nickname}
+                        </Link>
+                        <span className="text-xs text-muted-foreground">@{r.user.username} · {timeAgo(r.createdAt)}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => decideMutation.mutate({ requestId: r.id, approve: true })}
+                        disabled={decideMutation.isPending}
+                      >
+                        <FaCheck className="h-3.5 w-3.5 text-success" /> Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => decideMutation.mutate({ requestId: r.id, approve: false })}
+                        disabled={decideMutation.isPending}
+                      >
+                        Reject
+                      </Button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
             {membersData?.items.map((m) => (
               <li key={m.userId} className="flex items-center gap-3 p-4">
@@ -298,7 +369,7 @@ export function GroupDetailPage() {
                 <div>
                   <p className="text-sm font-semibold">Danger zone</p>
                   <p className="text-xs text-muted-foreground">
-                    Deleting the group removes all its resources and memberships. This cannot be undone.
+                    Deleting the group removes its shared repositories' links and all memberships.
                   </p>
                 </div>
                 <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
@@ -315,7 +386,7 @@ export function GroupDetailPage() {
           <DialogHeader>
             <DialogTitle>Delete this group?</DialogTitle>
             <DialogDescription>
-              “{group.name}” and all of its {group.resourceCount} resource{group.resourceCount === 1 ? '' : 's'} will be permanently removed.
+              “{group.name}” and all of its memberships will be permanently removed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -50,15 +50,16 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
 }
 
 /**
- * Uploads a single resource via XMLHttpRequest so we can report real progress.
+ * Uploads files via XMLHttpRequest so we can report real progress.
  */
-export function uploadResource(
+export function uploadFiles(
+  path: string,
   formData: FormData,
   onProgress: (percent: number) => void,
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/resources');
+    xhr.open('POST', path);
     const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 

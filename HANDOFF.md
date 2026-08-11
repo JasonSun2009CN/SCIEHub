@@ -1,9 +1,10 @@
 # SCIEHub — Handoff
 
 ## 当前状态
-**全部模块已完成并通过验证**（生产构建 + API 端到端测试 + Headless Chrome 渲染）。核心数据已 seed（13 资源 / 6 小组 / 6 用户，含可下载的占位文件），首次启动自动建表。
-- 前端：10 个页面 + 深/浅主题 + shadcn/ui 组件 + TanStack Query 数据层。
+**全部模块完成并通过验证**（生产构建 + API 端到端测试 + Headless Chrome 渲染）。采用 **Repository 模型**：用户拥有仓库、可分享进小组；加入小组需创建人审批；社区有榜单与公约。**无演示数据**——首次启动创建空库，注册后即可使用。
+- 前端：12 个页面 + 深/浅主题 + shadcn/ui 组件 + TanStack Query 数据层。
 - 后端：Fastify REST API、JWT 认证、multipart 上传落盘、生产静态托管 + SPA fallback。
+- 迭代二新增：repos/repo_groups/group_requests/reports 表、/leaderboard、/conduct、举报按钮、加入审批。
 - `npm run dev` 本地开发；`npm run build && npm start` 部署即用。
 
 ## 已确认决策
@@ -25,7 +26,7 @@
 ## 运行方式
 - 开发：`npm run dev` — Fastify 在 :4000，Vite dev 在 :5173（代理 /api 与 /uploads）。
 - 生产：`npm run build && npm start` — Fastify 在 :4000 同时托管前端产物与 API，SPA fallback 已配置，deep-link 直达可用。
-- 演示账号：`alice@sciehub.io` / `password123`（详见 README）。
+- 数据：首次启动自动建空库（无演示数据），在 /auth 注册账号即可使用。
 
 ## 项目结构
 ```

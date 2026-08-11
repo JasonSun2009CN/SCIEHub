@@ -2,7 +2,9 @@
 
 动态网站全栈项目：React 前端 + Node/Fastify 后端 + SQLite，monorepo 管理。目标：尽快完成全部模块，部署到服务器后直接可用。MVP 阶段不写自动化测试，以手动验证为准。
 
-**Status: ✅ All phases complete** (verified via production build + end-to-end API tests + headless browser render).
+**Status: ✅ All phases complete**（含 Phase 7 迭代二，verified via production build + end-to-end API tests + headless browser render）。
+
+> Phase 0–6 为原始资源/小组模型；Phase 7 依据后续需求迭代为「Repository 模型 + 社区功能」。
 
 ## Phase 0 — 工程脚手架 ✅
 - [x] monorepo 落地：packages/web + packages/server + packages/shared（npm workspaces），共享类型起步
@@ -43,7 +45,16 @@
 - [x] 环境变量：JWT_SECRET、端口、数据库路径、上传目录
 - [x] 空库自动建表 + seed，`npm start` 一键启动，按部署清单验证
 
+## Phase 7 — Repository 模型 + 社区功能（迭代二）✅
+- [x] 清理：删除根目录空文件、未使用文件、全部演示数据与 demo 用户（空库启动）
+- [x] 仓库模型：用户拥有仓库，可分享进小组；Feed 展示仓库，仓库详情列出多个文件
+- [x] 小组加入审批：加入需创建人同意（请求/同意/拒绝），管理员审批面板
+- [x] 社区榜单：/leaderboard 按文件数量排名，同时展示总大小（文件数 + 大小）
+- [x] 社区公约：/conduct 页面 + 仓库/评论举报按钮（举报存库）
+- [x] 空数据启动验证：0 资源 0 用户可正常启动，各页面空状态正常
+
 ## 验证记录
-- 全链路 API 测试通过：注册/登录/鉴权、上传（multipart 落盘）、下载、收藏、评论、加入/退出小组、建组/改组/删组、越权拦截
+- 迭代一全链路 API 测试通过：注册/登录/鉴权、上传（multipart 落盘）、下载、收藏、评论、加入/退出小组、建组/改组/删组、越权拦截
+- 迭代二全链路 API 测试通过：建仓/多文件上传/分享进小组/仓库下载、加入请求→审批→成为成员、非管理员不可见请求列表、榜单排名（按文件数+大小）、举报（含非法 reason 拦截）、非 owner 上传拦截
 - 生产构建全绿（shared + server + web），无类型错误
-- Headless Chrome 渲染验证：首页 / Feed / 小组 / 资源详情 均正常挂载并渲染真实数据
+- Headless Chrome 渲染验证：首页 / Feed / 小组 / 榜单 / 公约 / 登录 均正常挂载（空库空状态正常）

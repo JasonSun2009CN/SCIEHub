@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FaFolder, FaUsers } from 'react-icons/fa';
+import { FaBook, FaUsers } from 'react-icons/fa';
 import type { Group } from '@sciehub/shared';
 import { Badge } from '@/components/ui/badge';
 import { UserAvatar } from './UserAvatar';
@@ -28,7 +28,11 @@ export function GroupCard({ group, index = 0 }: GroupCardProps) {
             <span className="text-xs text-muted-foreground">{group.categoryName}</span>
           </div>
         </Link>
-        {group.isMember && <Badge variant="success">Joined</Badge>}
+        {group.isMember ? (
+          <Badge variant="success">Joined</Badge>
+        ) : group.joinStatus === 'pending' ? (
+          <Badge variant="warning">Pending</Badge>
+        ) : null}
       </div>
 
       <p className="mt-3 line-clamp-2 flex-1 text-sm text-muted-foreground">{group.description}</p>
@@ -38,7 +42,7 @@ export function GroupCard({ group, index = 0 }: GroupCardProps) {
           <FaUsers className="h-3 w-3" /> {formatNumber(group.memberCount)} members
         </span>
         <span className="flex items-center gap-1">
-          <FaFolder className="h-3 w-3" /> {formatNumber(group.resourceCount)} resources
+          <FaBook className="h-3 w-3" /> {formatNumber(group.repoCount)} repositories
         </span>
       </div>
 

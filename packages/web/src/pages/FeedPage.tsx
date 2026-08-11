@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FaSearch, FaSpinner, FaUsers } from 'react-icons/fa';
-import { CATEGORIES, type Group, type HomeData, type ResourceListResult } from '@sciehub/shared';
+import { FaBook, FaSearch, FaSpinner, FaUsers } from 'react-icons/fa';
+import { CATEGORIES, type Group, type HomeData, type Repository, type RepoListResult } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { ResourceCard } from '@/components/generated/ResourceCard';
-import { FileTypeIcon } from '@/components/generated/FileTypeIcon';
+import { RepositoryCard } from '@/components/generated/RepositoryCard';
 import { useAuth } from '@/context/AuthContext';
 import { timeAgo } from '@/lib/utils';
 
@@ -38,7 +36,7 @@ export function FeedPage() {
 
   const [searchInput, setSearchInput] = useState(q);
   const [offset, setOffset] = useState(0);
-  const [items, setItems] = useState<ResourceListResult['items']>([]);
+  const [items, setItems] = useState<Repository[]>([]);
 
   const currentKey = useRef(paramsKey);
   useEffect(() => {
@@ -46,10 +44,10 @@ export function FeedPage() {
   }, [paramsKey]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['resources', paramsKey, offset],
+    queryKey: ['repos', paramsKey, offset],
     queryFn: () =>
-      api<ResourceListResult>(
-        `/resources?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}&limit=${PAGE_SIZE}&offset=${offset}`,
+      api<RepoListResult>(
+        `/repos?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}&limit=${PAGE_SIZE}&offset=${offset}`,
       ),
   });
 
@@ -88,7 +86,7 @@ export function FeedPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <PageMeta title="Feed" description="Browse and search shared study materials on SCIEHub." />
+      <PageMeta title="Feed" description="Browse and search shared study repositories on SCIEHub." />
 
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Left sidebar */}
@@ -146,9 +144,9 @@ export function FeedPage() {
               <Input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search resources…"
+                placeholder="Search repositories…"
                 className="pl-9"
-                aria-label="Search resources"
+                aria-label="Search repositories"
               />
             </form>
             <Select value={category} onValueChange={(v) => setParam('category', v === 'all' ? '' : v)}>
@@ -194,23 +192,20 @@ export function FeedPage() {
               ))
             ) : items.length === 0 ? (
               <div className="rounded-lg border border-border bg-surface py-16 text-center">
-                <p className="font-medium">No resources found</p>
-                <p className="mt-1 text-sm text-muted-foreground">Try a different search term or category.</p>
+                <FaBook className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="mt-3 font-medium">No repositories found</p>
+                <p className="mt-1 text-sm text-muted-foreground">Try a different search term or be the first to share one.</p>
               </div>
             ) : (
-              items.map((resource, i) => (
-                <ResourceCard key={resource.id} resource={resource} index={i} />
+              items.map((repo, i) => (
+                <RepositoryCard key={repo.id} repo={repo} index={i} />
               ))
             )}
           </div>
 
           {hasMore && (
             <div className="mt-6 flex justify-center">
-              <Button
-                variant="outline"
-                onClick={() => setOffset((o) => o + PAGE_SIZE)}
-                disabled={isLoading}
-              >
+              <Button variant="outline" onClick={() => setOffset((o) => o + PAGE_SIZE)} disabled={isLoading}>
                 {isLoading ? <FaSpinner className="h-4 w-4 animate-spin" /> : null}
                 Load more
               </Button>
@@ -220,38 +215,40 @@ export function FeedPage() {
 
         {/* Right sidebar */}
         <aside className="hidden lg:col-span-3 lg:block">
-          <SidebarBlock title="Recent uploads">
+          <SidebarBlock title="Recently shared">
             <ul className="space-y-3">
-              {(home?.recentUploads ?? []).slice(0, 7).map((r) => (
+              {(home?.recentRepos ?? []).slice(0, 7).map((r) => (
                 <li key={r.id}>
-                  <Link to={`/resources/${r.id}`} className="group flex items-start gap-2.5">
-                    <FileTypeIcon type={r.fileType} className="mt-0.5 h-4 w-4 shrink-0" />
+                  <Link to={`/repos/${r.id}`} className="group flex items-start gap-2.5">
+                    <FaBook className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                     <span className="min-w-0">
-                      <span className="line-clamp-1 block text-sm group-hover:text-accent">{r.title}</span>
+                      <span className="line-clamp-1 block text-sm group-hover:text-accent">{r.name}</span>
                       <span className="text-xs text-muted-foreground">
-                        {r.uploader.nickname} · {timeAgo(r.createdAt)}
+                        {r.owner.nickname} · {timeAgo(r.createdAt)}
                       </span>
                     </span>
                   </Link>
                 </li>
               ))}
+              {(home?.recentRepos?.length ?? 0) === 0 && (
+                <p className="text-xs text-muted-foreground">Nothing shared yet.</p>
+              )}
             </ul>
           </SidebarBlock>
 
           {q && (
             <div className="mt-6 rounded-lg border border-accent bg-accent-subtle p-4 text-sm">
               <span className="font-medium">Showing results for “{q}”</span>
-              <button
-                onClick={() => setParam('q', '')}
-                className="mt-1 block cursor-pointer text-accent hover:underline"
-              >
+              <button onClick={() => setParam('q', '')} className="mt-1 block cursor-pointer text-accent hover:underline">
                 Clear search
               </button>
             </div>
           )}
 
           <div className="mt-6">
-            <Badge variant="secondary">{total} resource{total === 1 ? '' : 's'}</Badge>
+            <span className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted-foreground">
+              {total} repository{total === 1 ? '' : 'ies'}
+            </span>
           </div>
         </aside>
       </div>
