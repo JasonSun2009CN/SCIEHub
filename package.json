@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "concurrently -n server,web -c cyan,magenta \"npm run dev -w @sciehub/server\" \"npm run dev -w @sciehub/web\"",
     "build": "npm run build -w @sciehub/shared && npm run build -w @sciehub/server && npm run build -w @sciehub/web",
+    "prestart": "npm run build",
     "start": "npm run start -w @sciehub/server",
+    "deploy": "npm run build && npm run start -w @sciehub/server",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

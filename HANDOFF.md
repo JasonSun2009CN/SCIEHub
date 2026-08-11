@@ -5,7 +5,8 @@
 - 前端：12 个页面 + 深/浅主题 + shadcn/ui 组件 + TanStack Query 数据层。
 - 后端：Fastify REST API、JWT 认证、multipart 上传落盘、生产静态托管 + SPA fallback。
 - 迭代二新增：repos/repo_groups/group_requests/reports 表、/leaderboard、/conduct、举报按钮、加入审批。
-- `npm run dev` 本地开发；`npm run build && npm start` 部署即用。
+- 迭代三：页脚仅保留 GitHub 仓库地址（移除社媒）；邮箱占用申诉 mailto（jasonsun2009@yeah.net）；`npm start` 自动构建、`npm run deploy` 部署即用。
+- `npm run dev` 本地开发；`npm start`（自动构建）或 `npm run deploy` 部署即用。
 
 ## 已确认决策
 | 项 | 决策 |

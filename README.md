@@ -24,7 +24,7 @@ A GitHub-style study-materials sharing platform for international high school st
 - **Comments & favorites** per repository, per-file download counters, drag-and-drop multi-file uploads with progress.
 - **Dark/light themes** (dark default) driven by CSS-variable tokens.
 
-## Getting started
+## Getting started (development)
 
 ```bash
 npm install          # installs all workspaces
@@ -33,14 +33,38 @@ npm run dev          # Fastify API on :4000 + Vite dev server on :5173 (proxies 
 
 Open http://localhost:5173.
 
-### Production (deploy-to-server)
+## Deploying to a server
+
+Requirements: **Node.js 18+** (tested on 22) and **npm**. No database service is needed — SQLite is a single file.
+
+On a fresh server, from a clean clone:
 
 ```bash
-npm run build        # builds shared → server → web
-npm start            # Fastify serves the built SPA + API on :4000
+# 1. Install everything
+npm install
+
+# 2. Build the frontend + backend, then start
+npm start
+#   npm start automatically runs the production build first (via "prestart").
+#   Equivalent one-shot command: npm run deploy
+
+# 3. Open
+#   http://<server-ip-or-domain>:4000
 ```
 
-Open http://localhost:4000. A blank database is created automatically on first boot — **no demo data is included**; register your own account from the **Sign in** page.
+`npm start` serves **both the built SPA and the API** on port `4000`. On first boot the app creates an empty SQLite database (`packages/server/data/sciehub.db`) and an uploads folder automatically — **no demo data is included**. Register an account at `/auth` and it works immediately.
+
+### Production checklist
+
+| Step | Command / value |
+| --- | --- |
+| Open the firewall/security-group port | `4000` |
+| Set a real signing secret | `JWT_SECRET=<long-random-string> npm start` (otherwise a dev default is used) |
+| Optional: custom port | `PORT=8080 npm start` |
+| Optional: bind address | default `0.0.0.0` (all interfaces) |
+| Keep the service running | run under `pm2 start 'npm start'` or a systemd unit |
+
+Back up two things after real usage starts: `packages/server/data/sciehub.db` and `packages/server/data/uploads/`.
 
 ## Environment variables
 
@@ -82,6 +106,8 @@ packages/
 
 - Joining a group creates a **join request**; the group creator (admin) approves/rejects it. Admins cannot leave — they delete the group instead.
 - Reports (`reports` table) are stored for future moderation; there is no review UI yet.
+- **Email registered without your permission?** If you find your email is already taken on the sign-up page, use that email to write to `jasonsun2009@yeah.net` — the sign-up form includes a ready-made "claim" email link. Never create an account on an email you don't own.
 - Uploaded files live on the server disk; the database stores relative paths. Back up both `data/sciehub.db` and `data/uploads/`.
 - React Router uses history mode — the Fastify server falls back to `index.html` so deep links and refreshes work in production.
+- Source: [github.com/JasonSun2009CN/SCIEHub](https://github.com/JasonSun2009CN/SCIEHub)
 - Architecture decisions are recorded in [`ADR.md`](./ADR.md); see [`ROADMAP.md`](./ROADMAP.md) and [`HANDOFF.md`](./HANDOFF.md) for status and handoff details.

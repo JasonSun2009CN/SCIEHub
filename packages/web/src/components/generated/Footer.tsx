@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import { FaGithub, FaGraduationCap, FaInstagram, FaLinkedinIn, FaTwitter } from 'react-icons/fa';
+import { FaGithub, FaGraduationCap } from 'react-icons/fa';
+
+const GITHUB_REPO = 'https://github.com/JasonSun2009CN/SCIEHub';
 
 const PLATFORM_LINKS = [
   { to: '/feed', label: 'Resources' },
@@ -7,13 +9,6 @@ const PLATFORM_LINKS = [
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/conduct', label: 'Community guidelines' },
   { to: '/upload', label: 'Upload' },
-];
-
-const SOCIALS = [
-  { href: 'https://github.com', label: 'GitHub', Icon: FaGithub },
-  { href: 'https://twitter.com', label: 'Twitter', Icon: FaTwitter },
-  { href: 'https://instagram.com', label: 'Instagram', Icon: FaInstagram },
-  { href: 'https://linkedin.com', label: 'LinkedIn', Icon: FaLinkedinIn },
 ];
 
 export function Footer() {
@@ -55,21 +50,16 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold">Connect</h3>
-            <div className="mt-3 flex gap-2">
-              {SOCIALS.map(({ href, label, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:border-accent hover:text-accent"
-                >
-                  <Icon className="h-4 w-4" />
-                </a>
-              ))}
-            </div>
+            <h3 className="text-sm font-semibold">Source</h3>
+            <a
+              href={GITHUB_REPO}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+            >
+              <FaGithub className="h-4 w-4" />
+              Source on GitHub
+            </a>
           </div>
         </div>
 

@@ -85,7 +85,7 @@ export function ConductPage() {
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
         Questions? Email the community team at{' '}
-        <a href="mailto:support@sciehub.io" className="text-accent hover:underline">support@sciehub.io</a>.
+        <a href="mailto:jasonsun2009@yeah.net" className="text-accent hover:underline">jasonsun2009@yeah.net</a>.
       </p>
     </div>
   );

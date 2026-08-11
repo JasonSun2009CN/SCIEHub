@@ -1,14 +1,27 @@
 import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaEnvelope, FaLock, FaSpinner, FaUser } from 'react-icons/fa';
+import { FaEnvelope, FaExclamationTriangle, FaLock, FaSpinner, FaUser } from 'react-icons/fa';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ApiError } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { cn } from '@/lib/utils';
+
+/** If someone finds their email registered without their permission, they email this address from that email. */
+const CLAIM_EMAIL = 'jasonsun2009@yeah.net';
+
+function claimHref(email: string): string {
+  const subject = 'SCIEHub: claim an account registered to my email';
+  const body =
+    'Hi SCIEHub team,\n\nI believe this email was registered on SCIEHub without my permission. Please help me take over or remove that account.\n\nEmail: ' +
+    (email || '<my email>') +
+    '\n\nThanks.';
+  return `mailto:${CLAIM_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 
 function Field({ icon, label, id, type, value, onChange, placeholder, autoComplete }: {
   icon: React.ReactNode;
@@ -48,6 +61,7 @@ export function AuthPage() {
   const from = (location.state as { from?: string } | null)?.from ?? '/';
 
   const [error, setError] = useState('');
+  const [emailTaken, setEmailTaken] = useState(false);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -84,6 +98,7 @@ export function AuthPage() {
   const onRegister = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailTaken(false);
     setRegBusy(true);
     try {
       await register({ username: regUsername.trim(), nickname: regNickname.trim(), email: regEmail, password: regPassword });
@@ -91,6 +106,8 @@ export function AuthPage() {
       navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
+      // 409 = this email is already registered — offer an account-claim path.
+      setEmailTaken(err instanceof ApiError && err.status === 409);
     } finally {
       setRegBusy(false);
     }
@@ -200,9 +217,35 @@ export function AuthPage() {
                 Create account
               </Button>
             </form>
+            {emailTaken && (
+              <div className="mt-4 rounded-md border border-warning bg-[rgb(251_191_36_/_0.1)] p-4 text-sm">
+                <p className="flex items-start gap-2 font-medium text-warning">
+                  <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  {regEmail} is already registered.
+                </p>
+                <p className="mt-2 text-muted-foreground">
+                  Did someone else register this email without your permission? Use{' '}
+                  <span className="font-medium">{regEmail}</span> to email the SCIEHub team and claim or remove the
+                  account.
+                </p>
+                <a
+                  href={claimHref(regEmail)}
+                  className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-warning px-3 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                >
+                  <FaEnvelope className="h-4 w-4" /> Claim this email
+                </a>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
+
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        Was your email registered by someone else?{' '}
+        <a href={claimHref('')} className="cursor-pointer text-accent hover:underline">
+          Contact the SCIEHub team to claim it
+        </a>
+      </p>
     </div>
   );
 }
