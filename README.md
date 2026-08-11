@@ -1,6 +1,6 @@
 # SCIEHub
 
-A GitHub-style study-materials sharing platform for international high school students (IB · A-Level · AP · IGCSE).
+A GitHub-style study-materials sharing platform for international high school students (IB · AS/A-Level · AP · IGCSE).
 
 **Share, Collaborate, Excel.** Create your own study repositories — each holding multiple files like a GitHub repo — share them into subject groups, compete on the community leaderboard, and download from classmates. Dark-first, GitHub-inspired interface.
 
