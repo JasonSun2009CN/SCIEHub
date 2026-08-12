@@ -3,7 +3,6 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import {
-  AVATAR_COLORS,
   categoryName,
   type AdminReportItem,
   type Comment,
@@ -20,7 +19,7 @@ import {
   type Repository,
   type User,
 } from '@sciehub/shared';
-import { config, SEED_ADMIN } from './config.js';
+import { config } from './config.js';
 
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 fs.mkdirSync(config.uploadDir, { recursive: true });
@@ -1168,25 +1167,13 @@ export function listUserLogins(userId: string, limit = 30): LoginLog[] {
 }
 
 // ---------------------------------------------------------------------------
-// Seed
-// ---------------------------------------------------------------------------
-
-/** Creates the owner's admin account if it doesn't exist yet. */
-export function seedAdmin(): void {
-  if (getUserByEmail(SEED_ADMIN.email)) return;
-  const user = createUser({
-    username: SEED_ADMIN.username,
-    email: SEED_ADMIN.email,
-    nickname: SEED_ADMIN.nickname,
-    passwordHash: SEED_ADMIN.passwordHash,
-    avatarUrl: AVATAR_COLORS[0],
-  });
-  setUserAdmin(user.id, true);
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Total registered users — used to make the very first registered user an admin. */
+export function getUserCount(): number {
+  return (db.prepare(`SELECT COUNT(*) AS c FROM users`).get() as any).c;
+}
 
 export function inferFileType(name: string): FileType {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';

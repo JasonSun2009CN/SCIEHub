@@ -10,6 +10,7 @@ import {
   getUserByEmail,
   getUserById,
   getUserByUsername,
+  getUserCount,
   getUserPasswordHash,
   logLogin,
   setUserAdmin,
@@ -59,6 +60,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(409).send({ error: 'This username is already taken' });
     }
 
+    // The very first registered user becomes the site admin (no password ever
+    // lives in the codebase). ADMIN_EMAILS and promote-admin remain as backups.
+    const isFirstUser = getUserCount() === 0;
     const user = createUser({
       username,
       email,
@@ -66,6 +70,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       passwordHash: bcrypt.hashSync(password, 10),
       avatarUrl: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
     });
+    if (isFirstUser) setUserAdmin(user.id, true);
     promoteIfAdmin(user.id, email);
     logLogin({ userId: user.id, email, success: true, ip, userAgent });
 

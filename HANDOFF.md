@@ -7,8 +7,8 @@
 - 迭代二新增：repos/repo_groups/group_requests/reports 表、/leaderboard、/conduct、举报按钮、加入审批。
 - 迭代三：页脚仅保留 GitHub 仓库地址（移除社媒）；邮箱占用申诉 mailto（jasonsun2009@yeah.net）；`npm start` 自动构建、`npm run deploy` 部署即用。
 - 迭代四：管理员端（/admin 概览/报告/用户/仓库，封禁/注销/删除违规内容）、`ADMIN_EMAILS` 自动晋升 + `promote-admin` 脚本、忘记密码联系管理员 mailto。
-- 迭代五：种子管理员 2022531780@qq.com（首启自动建，bcrypt 哈希内置）；登录记录 + 登录历史查看 + 全部登出（token_version）；注销两种（停用 30 天/登录恢复/超期删除 + 密码确认永久删除）；管理员新增 + 让位 + 最后管理员守卫。
-- 管理员开通：`ADMIN_EMAILS=你@邮箱 npm start` 注册后自动成为管理员；或已注册用户运行 `npm run promote-admin -w @sciehub/server -- <email>`。内置管理员默认即 `2022531780@qq.com`。
+- 迭代五：**首个注册用户自动成为管理员**（代码无任何密码/哈希）；登录记录 + 登录历史查看 + 全部登出（token_version）；注销两种（停用 30 天/登录恢复/超期删除 + 密码确认永久删除）；管理员新增 + 让位 + 最后管理员守卫。
+- 管理员开通（三种）：① 全新安装时第一个注册的账号即管理员；② `ADMIN_EMAILS=邮箱 npm start`，该邮箱注册/登录自动晋升；③ `npm run promote-admin -w @sciehub/server -- <email>`。
 - `npm run dev` 本地开发；`npm start`（自动构建）或 `npm run deploy` 部署即用。
 
 ## 已确认决策

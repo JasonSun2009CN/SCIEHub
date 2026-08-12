@@ -5,7 +5,7 @@ import multipart from '@fastify/multipart';
 import staticPlugin from '@fastify/static';
 import { config } from './config.js';
 import { authOnRequest } from './auth.js';
-import { closeDb, deleteUsersDeactivatedBefore, seedAdmin } from './db.js';
+import { closeDb, deleteUsersDeactivatedBefore } from './db.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerRepoRoutes } from './routes/repos.js';
@@ -54,9 +54,8 @@ app.setNotFoundHandler((req, reply) => {
   return reply.code(404).send({ error: `Not found (build the frontend with npm run build to serve it here)` });
 });
 
-// Ensure the owner's admin account exists, then start the 30-day cleanup for
-// deactivated accounts (they are deleted if never signed into again).
-seedAdmin();
+// Start the 30-day cleanup for deactivated accounts (deleted if never signed
+// into again). The first registered user becomes the site admin automatically.
 const cleanupJob = setInterval(() => {
   const deleted = deleteUsersDeactivatedBefore(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
   if (deleted > 0) app.log.info(`Cleaned up ${deleted} deactivated account(s)`);
