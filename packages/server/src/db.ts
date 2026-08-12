@@ -3,7 +3,9 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import {
+  AVATAR_COLORS,
   categoryName,
+  type AdminReportItem,
   type Comment,
   type FileType,
   type Group,
@@ -11,13 +13,14 @@ import {
   type GroupRequest,
   type HomeData,
   type LeaderboardEntry,
+  type LoginLog,
   type RepoFile,
   type Report,
   type ReportTarget,
   type Repository,
   type User,
 } from '@sciehub/shared';
-import { config } from './config.js';
+import { config, SEED_ADMIN } from './config.js';
 
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 fs.mkdirSync(config.uploadDir, { recursive: true });
@@ -39,7 +42,11 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   avatar_url    TEXT NOT NULL DEFAULT '',
   bio           TEXT NOT NULL DEFAULT '',
-  created_at    TEXT NOT NULL
+  created_at    TEXT NOT NULL,
+  is_admin      INTEGER NOT NULL DEFAULT 0,
+  is_suspended  INTEGER NOT NULL DEFAULT 0,
+  token_version INTEGER NOT NULL DEFAULT 0,
+  deactivated_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -131,7 +138,28 @@ CREATE TABLE IF NOT EXISTS reports (
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+
+CREATE TABLE IF NOT EXISTS login_logs (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT REFERENCES users(id) ON DELETE SET NULL,
+  email      TEXT NOT NULL,
+  success    INTEGER NOT NULL DEFAULT 0,
+  ip         TEXT NOT NULL DEFAULT '',
+  user_agent TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_logs_user ON login_logs(user_id, created_at DESC);
 `);
+
+// Idempotent migration: add columns to databases created before newer features.
+function ensureColumns(): void {
+  const cols = (db.prepare(`PRAGMA table_info(users)`).all() as any[]).map((c) => c.name);
+  if (!cols.includes('is_admin')) db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
+  if (!cols.includes('is_suspended')) db.exec(`ALTER TABLE users ADD COLUMN is_suspended INTEGER NOT NULL DEFAULT 0`);
+  if (!cols.includes('token_version')) db.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
+  if (!cols.includes('deactivated_at')) db.exec(`ALTER TABLE users ADD COLUMN deactivated_at TEXT`);
+}
+ensureColumns();
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -174,6 +202,8 @@ function mapUser(row: any): User {
     groupCount: row.group_count,
     totalDownloads: row.total_downloads,
     totalBytes: row.total_bytes,
+    isAdmin: Boolean(row.is_admin),
+    isSuspended: Boolean(row.is_suspended),
   };
 }
 
@@ -922,6 +952,236 @@ export function createReport(input: {
     createdAt: now,
     status: 'open',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+export function setUserAdmin(userId: string, isAdmin: boolean): void {
+  db.prepare(`UPDATE users SET is_admin = ? WHERE id = ?`).run(isAdmin ? 1 : 0, userId);
+}
+
+export function setUserSuspended(userId: string, suspended: boolean): void {
+  db.prepare(`UPDATE users SET is_suspended = ? WHERE id = ?`).run(suspended ? 1 : 0, userId);
+}
+
+/** Permanently deletes a user; cascades to their repos, files, memberships, comments, favorites and reports. */
+export function deleteUser(userId: string): void {
+  db.prepare(`DELETE FROM users WHERE id = ?`).run(userId);
+}
+
+export function listAdminUsers(args: {
+  search?: string;
+  offset: number;
+  limit: number;
+}): { items: User[]; total: number } {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (args.search) {
+    where.push(`(u.username LIKE ? OR u.nickname LIKE ? OR u.email LIKE ?)`);
+    params.push(`%${args.search}%`, `%${args.search}%`, `%${args.search}%`);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM users u ${whereSql}`).get(...params) as any).c;
+  const rows = db
+    .prepare(`${USER_SELECT} ${whereSql} ORDER BY u.created_at DESC LIMIT ? OFFSET ?`)
+    .all(...params, args.limit, args.offset) as any[];
+  return {
+    items: rows.map((row) => {
+      const user = mapUser(row);
+      user.email = row.email;
+      return user;
+    }),
+    total,
+  };
+}
+
+export function listReports(args: {
+  status?: string;
+  offset: number;
+  limit: number;
+}): { items: AdminReportItem[]; total: number } {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (args.status) {
+    where.push(`rp.status = ?`);
+    params.push(args.status);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM reports rp ${whereSql}`).get(...params) as any).c;
+  const rows = db
+    .prepare(
+      `SELECT rp.*,
+              u.username AS username, u.nickname AS nickname, u.avatar_url AS avatar_url,
+              u.bio AS bio, u.created_at AS user_created_at,
+              (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
+              (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
+              (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
+              (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
+              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+              CASE rp.target_type
+                WHEN 'repo' THEN (SELECT name FROM repos WHERE id = rp.target_id)
+                WHEN 'comment' THEN (SELECT r.name FROM comments c JOIN repos r ON r.id = c.repo_id WHERE c.id = rp.target_id)
+              END AS target_name,
+              CASE rp.target_type
+                WHEN 'repo' THEN rp.target_id
+                WHEN 'comment' THEN (SELECT c.repo_id FROM comments c WHERE c.id = rp.target_id)
+              END AS target_repo_id
+       FROM reports rp
+       JOIN users u ON u.id = rp.reporter_id
+       ${whereSql}
+       ORDER BY rp.created_at DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...params, args.limit, args.offset) as any[];
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      reporterId: row.reporter_id,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      reason: row.reason,
+      createdAt: row.created_at,
+      status: row.status,
+      reporter: mapUser(row),
+      targetName: row.target_name ?? '',
+      targetRepoId: row.target_repo_id ?? null,
+    })),
+    total,
+  };
+}
+
+export function getAdminOverview(): { stats: HomeData['stats']; comments: number; openReports: number } {
+  return {
+    stats: getStats(),
+    comments: (db.prepare(`SELECT COUNT(*) AS c FROM comments`).get() as any).c,
+    openReports: countOpenReports(),
+  };
+}
+
+export function countOpenReports(): number {
+  return (db.prepare(`SELECT COUNT(*) AS c FROM reports WHERE status = 'open'`).get() as any).c;
+}
+
+export function setReportStatus(reportId: string, status: 'open' | 'resolved'): void {
+  db.prepare(`UPDATE reports SET status = ? WHERE id = ?`).run(status, reportId);
+}
+
+export function deleteComment(commentId: string): void {
+  db.prepare(`DELETE FROM comments WHERE id = ?`).run(commentId);
+}
+
+/** Deletes a file row and returns it (so the caller can remove the disk file). */
+export function deleteFileById(fileId: string): RepoFile | null {
+  const file = getRepoFileById(fileId);
+  if (!file) return null;
+  db.prepare(`DELETE FROM files WHERE id = ?`).run(fileId);
+  return file;
+}
+
+// ---------------------------------------------------------------------------
+// Account lifecycle & login history
+// ---------------------------------------------------------------------------
+
+/** Deletes a user and removes all of their uploaded files from disk (DB rows cascade). */
+export function deleteUserWithFiles(userId: string): void {
+  const repos = listRepos({ ownerId: userId, limit: 100, offset: 0 }, null).items;
+  for (const repo of repos) {
+    for (const file of listRepoFiles(repo.id)) {
+      try {
+        fs.unlinkSync(path.join(config.uploadDir, path.basename(file.filePath)));
+      } catch {
+        // file already missing — fine
+      }
+    }
+  }
+  deleteUser(userId);
+}
+
+/** Returns how many users were permanently deleted. */
+export function deleteUsersDeactivatedBefore(beforeIso: string): number {
+  const rows = db
+    .prepare(`SELECT id FROM users WHERE deactivated_at IS NOT NULL AND deactivated_at < ?`)
+    .all(beforeIso) as any[];
+  for (const r of rows) deleteUserWithFiles(r.id);
+  return rows.length;
+}
+
+export function countAdmins(): number {
+  return (db.prepare(`SELECT COUNT(*) AS c FROM users WHERE is_admin = 1`).get() as any).c;
+}
+
+export function getTokenVersion(userId: string): number {
+  return (db.prepare(`SELECT token_version FROM users WHERE id = ?`).get(userId) as any)?.token_version ?? 0;
+}
+
+export function bumpTokenVersion(userId: string): void {
+  db.prepare(`UPDATE users SET token_version = token_version + 1 WHERE id = ?`).run(userId);
+}
+
+export function setDeactivated(userId: string): void {
+  db.prepare(`UPDATE users SET deactivated_at = ? WHERE id = ?`).run(new Date().toISOString(), userId);
+}
+
+export function clearDeactivated(userId: string): void {
+  db.prepare(`UPDATE users SET deactivated_at = NULL WHERE id = ?`).run(userId);
+}
+
+export function getDeactivatedAt(userId: string): string | null {
+  return ((db.prepare(`SELECT deactivated_at FROM users WHERE id = ?`).get(userId) as any)?.deactivated_at ?? null) as string | null;
+}
+
+export function logLogin(input: {
+  userId: string | null;
+  email: string;
+  success: boolean;
+  ip: string | null;
+  userAgent: string | null;
+}): void {
+  db.prepare(
+    `INSERT INTO login_logs (id, user_id, email, success, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    randomUUID(),
+    input.userId,
+    input.email,
+    input.success ? 1 : 0,
+    input.ip ?? '',
+    input.userAgent ?? '',
+    new Date().toISOString(),
+  );
+}
+
+export function listUserLogins(userId: string, limit = 30): LoginLog[] {
+  const rows = db
+    .prepare(`SELECT * FROM login_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`)
+    .all(userId, limit) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    userId: r.user_id,
+    email: r.email,
+    success: Boolean(r.success),
+    ip: r.ip,
+    userAgent: r.user_agent,
+    createdAt: r.created_at,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Seed
+// ---------------------------------------------------------------------------
+
+/** Creates the owner's admin account if it doesn't exist yet. */
+export function seedAdmin(): void {
+  if (getUserByEmail(SEED_ADMIN.email)) return;
+  const user = createUser({
+    username: SEED_ADMIN.username,
+    email: SEED_ADMIN.email,
+    nickname: SEED_ADMIN.nickname,
+    passwordHash: SEED_ADMIN.passwordHash,
+    avatarUrl: AVATAR_COLORS[0],
+  });
+  setUserAdmin(user.id, true);
 }
 
 // ---------------------------------------------------------------------------

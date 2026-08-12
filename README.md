@@ -21,6 +21,8 @@ A GitHub-style study-materials sharing platform for international high school st
 - **Sharing** — a repo owner can share a repository into any group they belong to (and remove it again).
 - **Leaderboard** — `/leaderboard` ranks contributors by number of files shared, showing total size alongside.
 - **Community guidelines** — `/conduct` sets the rules; **Report** buttons on every repository and comment store reports for review.
+- **Admin console** — `/admin` lets admins see site stats, review reports, delete violating repositories/files/comments, and suspend, un-admin or delete users. Admins can add other admins and step down (transfer) their own role.
+- **Account safety** — every sign-in is logged (IP + browser); users can review their login history, **sign out all devices**, **deactivate** their account (deleted after 30 days unless they sign back in) or **permanently delete** it with their password.
 - **Comments & favorites** per repository, per-file download counters, drag-and-drop multi-file uploads with progress.
 - **Dark/light themes** (dark default) driven by CSS-variable tokens.
 
@@ -60,6 +62,8 @@ npm start
 | --- | --- |
 | Open the firewall/security-group port | `4000` |
 | Set a real signing secret | `JWT_SECRET=<long-random-string> npm start` (otherwise a dev default is used) |
+| Make yourself admin | `ADMIN_EMAILS=<your@email> npm start` — your account becomes admin on register/login. Or later: `npm run promote-admin -w @sciehub/server -- <email>` |
+| Built-in admin account | First boot auto-creates **admin / 2022531780@qq.com** (password is the site owner's; change it after first sign-in) |
 | Optional: custom port | `PORT=8080 npm start` |
 | Optional: bind address | default `0.0.0.0` (all interfaces) |
 | Keep the service running | run under `pm2 start 'npm start'` or a systemd unit |
@@ -73,6 +77,7 @@ Back up two things after real usage starts: `packages/server/data/sciehub.db` an
 | `PORT` | `4000` | HTTP port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `JWT_SECRET` | dev-only default | **Set a real secret in production** |
+| `ADMIN_EMAILS` | `2022531780@qq.com` | Comma-separated emails that get **admin** on register/login (default is the built-in owner account) |
 | `DB_PATH` | `packages/server/data/sciehub.db` | SQLite file |
 | `UPLOAD_DIR` | `packages/server/data/uploads` | Uploaded files |
 | `WEB_DIST` | `packages/web/dist` | Built frontend (served in production) |
@@ -99,6 +104,7 @@ packages/
 | `/users/:username` | Public profile — repositories / favorites / groups |
 | `/leaderboard` | Top contributors by files shared + total size |
 | `/conduct` | Community guidelines |
+| `/admin` | Admin console (admins only) |
 | `/settings` | Profile, avatar, notification prefs, password |
 | `/auth` | Sign in / register |
 
@@ -106,7 +112,9 @@ packages/
 
 - Joining a group creates a **join request**; the group creator (admin) approves/rejects it. Admins cannot leave — they delete the group instead.
 - Reports (`reports` table) are stored for future moderation; there is no review UI yet.
-- **Email registered without your permission?** If you find your email is already taken on the sign-up page, use that email to write to `jasonsun2009@yeah.net` — the sign-up form includes a ready-made "claim" email link. Never create an account on an email you don't own.
+- **Email registered without your permission?** If you find your email is already taken on the sign-up page, use that email to write to `jasonsun2009@yeah.net` — the sign-up form includes a ready-made "claim" email link. Never create an account on an email you don't own. Forgot your password? The sign-in form has a "contact the admin to reset it" link to the same address.
+- **Admins** can open `/admin` from their account menu. Emails in `ADMIN_EMAILS` are auto-promoted; otherwise use the `promote-admin` script. A built-in owner admin (`2022531780@qq.com`) is seeded on first boot. Admins can **add other admins** (Users tab) and **step down** (transfer) their own admin role — the last admin is protected from being removed.
+- **Account security** — every login attempt is recorded and shown on `/settings` (login history). "Sign out all devices" invalidates every session. Deactivating an account freezes it for 30 days; signing in again restores it, otherwise it is deleted. Accounts can also be permanently deleted with their password.
 - Uploaded files live on the server disk; the database stores relative paths. Back up both `data/sciehub.db` and `data/uploads/`.
 - React Router uses history mode — the Fastify server falls back to `index.html` so deep links and refreshes work in production.
 - Source: [github.com/JasonSun2009CN/SCIEHub](https://github.com/JasonSun2009CN/SCIEHub)

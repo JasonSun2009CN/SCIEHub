@@ -23,6 +23,15 @@ function claimHref(email: string): string {
   return `mailto:${CLAIM_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
+function forgotHref(email: string): string {
+  const subject = 'SCIEHub: reset my password';
+  const body =
+    'Hi SCIEHub team,\n\nI forgot my password and need it reset for my account.\n\nEmail: ' +
+    (email || '<my email>') +
+    '\n\nThanks.';
+  return `mailto:${CLAIM_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 function Field({ icon, label, id, type, value, onChange, placeholder, autoComplete }: {
   icon: React.ReactNode;
   label: string;
@@ -166,7 +175,10 @@ export function AuthPage() {
               </Button>
             </form>
             <p className="mt-4 text-center text-xs text-muted-foreground">
-              Demo accounts: alice@sciehub.io / password123
+              Forgot your password?{' '}
+              <a href={forgotHref(loginEmail)} className="cursor-pointer text-accent hover:underline">
+                Contact the admin to reset it
+              </a>
             </p>
           </TabsContent>
 

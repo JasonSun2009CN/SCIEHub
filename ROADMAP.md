@@ -59,6 +59,22 @@
 - [x] 部署即用：根 `npm start`（prestart 自动构建）与 `npm run deploy`，空库自动建表、SPA fallback、0.0.0.0 监听
 - [x] README 增加完整服务器部署步骤与生产检查清单
 
+## Phase 9 — 管理员端 + 忘记密码（迭代四）✅
+- [x] 管理员模型：users.is_admin / is_suspended + 幂等迁移；`ADMIN_EMAILS` 注册/登录自动晋升 + `promote-admin` 脚本
+- [x] requireAuth 拦截封禁用户（登录与既有 token 均 403），注销用户级联清理
+- [x] 管理 API：概览 / 报告列表·解决 / 用户搜索·设管理员·封禁·注销 / 仓库删除（含磁盘文件）/ 文件删除 / 评论删除，全部 requireAdmin 守卫
+- [x] 管理前端：/admin 四个 Tab（Overview/Reports/Users/Repositories），Header 用户菜单"Admin console"入口，非管理员自动跳转
+- [x] 忘记密码：登录页"Contact the admin to reset it" → mailto jasonsun2009@yeah.net（预填邮箱）
+- [x] 验证：ADMIN_EMAILS 晋升、非管理员 403、举报→管理员删除违规仓库、封禁/解封/晋升/注销用户、邮箱仅管理员可见、promote-admin 脚本
+
+## Phase 10 — 账号安全 + 管理员转让（迭代五）✅
+- [x] 种子管理员：首次启动自动创建 2022531780@qq.com（bcrypt 哈希，明文不入库）为管理员
+- [x] 登录记录：login_logs 表记录每次登录成败/IP/UA；用户可在 Settings 查看登录历史
+- [x] 全部登出：JWT 带 token_version，revoke 后所有旧会话失效
+- [x] 注销两种：停用（30 天内登录恢复，否则定时清理删除）/ 永久删除（密码确认）
+- [x] 管理员新增 + 让位（step down）；最后管理员不可移除/停用/自删
+- [x] 验证：种子管理员、登录记录、revoke、停用恢复、30 天过期删除、密码删除、最后管理员守卫、让位全通过
+
 ## 验证记录
 - 迭代一全链路 API 测试通过：注册/登录/鉴权、上传（multipart 落盘）、下载、收藏、评论、加入/退出小组、建组/改组/删组、越权拦截
 - 迭代二全链路 API 测试通过：建仓/多文件上传/分享进小组/仓库下载、加入请求→审批→成为成员、非管理员不可见请求列表、榜单排名（按文件数+大小）、举报（含非法 reason 拦截）、非 owner 上传拦截

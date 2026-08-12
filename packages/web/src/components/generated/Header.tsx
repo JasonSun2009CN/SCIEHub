@@ -6,6 +6,7 @@ import {
   FaGraduationCap,
   FaMoon,
   FaSearch,
+  FaShieldAlt,
   FaSignOutAlt,
   FaSun,
   FaUserCircle,
@@ -119,6 +120,11 @@ export function Header() {
                 <DropdownMenuItem onClick={() => navigate('/settings')}>
                   <FaCog className="h-4 w-4" /> Settings
                 </DropdownMenuItem>
+                {user.isAdmin && (
+                  <DropdownMenuItem onClick={() => navigate('/admin')}>
+                    <FaShieldAlt className="h-4 w-4 text-warning" /> Admin console
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout}>
                   <FaSignOutAlt className="h-4 w-4" /> Sign out

@@ -15,6 +15,10 @@ export interface User {
   groupCount: number;
   totalDownloads: number;
   totalBytes: number;
+  isAdmin?: boolean;
+  isSuspended?: boolean;
+  /** Only populated by admin endpoints — never exposed on public user objects. */
+  email?: string;
 }
 
 /** A user-owned repository of study files (GitHub-style). */
@@ -97,6 +101,17 @@ export interface Comment {
   createdAt: string;
 }
 
+/** One recorded sign-in attempt, shown on the user's "login history" screen. */
+export interface LoginLog {
+  id: string;
+  userId: string | null;
+  email: string;
+  success: boolean;
+  ip: string;
+  userAgent: string;
+  createdAt: string;
+}
+
 export interface LeaderboardEntry {
   user: User;
   repoCount: number;
@@ -115,6 +130,13 @@ export interface Report {
   reason: string;
   createdAt: string;
   status: 'open' | 'resolved';
+}
+
+/** A report enriched for the admin console (reporter + resolved target info). */
+export interface AdminReportItem extends Report {
+  reporter: User;
+  targetName: string;
+  targetRepoId: string | null;
 }
 
 export const REPORT_REASONS = [

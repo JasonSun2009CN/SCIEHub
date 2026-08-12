@@ -2,15 +2,29 @@ import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { AVATAR_COLORS, type AuthResponse } from '@sciehub/shared';
 import {
+  clearDeactivated,
   createUser,
+  deleteUserWithFiles,
+  getDeactivatedAt,
+  getTokenVersion,
   getUserByEmail,
   getUserById,
   getUserByUsername,
   getUserPasswordHash,
+  logLogin,
+  setUserAdmin,
   setUserPassword,
   updateUserProfile,
 } from '../db.js';
 import { requireAuth, signToken } from '../auth.js';
+import { config } from '../config.js';
+
+const GRACE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/** Emails listed in ADMIN_EMAILS are granted admin on their first sign-in. */
+function promoteIfAdmin(userId: string, email: string): void {
+  if (config.adminEmails.includes(email.trim().toLowerCase())) setUserAdmin(userId, true);
+}
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/auth/register', async (req, reply) => {
@@ -23,6 +37,8 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const username = body.username?.trim() ?? '';
     const email = body.email?.trim().toLowerCase() ?? '';
     const password = body.password ?? '';
+    const ip = req.ip ?? null;
+    const userAgent = (req.headers['user-agent'] as string | undefined) ?? null;
 
     if (!username || !email || !password) {
       return reply.code(400).send({ error: 'Username, email and password are required' });
@@ -50,8 +66,10 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       passwordHash: bcrypt.hashSync(password, 10),
       avatarUrl: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
     });
+    promoteIfAdmin(user.id, email);
+    logLogin({ userId: user.id, email, success: true, ip, userAgent });
 
-    const response: AuthResponse = { token: signToken(user), user };
+    const response: AuthResponse = { token: signToken(user, getTokenVersion(user.id)), user: getUserById(user.id)! };
     return response;
   });
 
@@ -59,15 +77,37 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     const body = (req.body ?? {}) as { email?: string; password?: string };
     const email = body.email?.trim().toLowerCase() ?? '';
     const password = body.password ?? '';
+    const ip = req.ip ?? null;
+    const userAgent = (req.headers['user-agent'] as string | undefined) ?? null;
     if (!email || !password) {
       return reply.code(400).send({ error: 'Email and password are required' });
     }
+
     const user = getUserByEmail(email);
     const hash = user ? getUserPasswordHash(user.id) : null;
     if (!user || !hash || !bcrypt.compareSync(password, hash)) {
+      logLogin({ userId: user?.id ?? null, email, success: false, ip, userAgent });
       return reply.code(401).send({ error: 'Invalid email or password' });
     }
-    const response: AuthResponse = { token: signToken(user), user };
+
+    if (user.isSuspended) {
+      logLogin({ userId: user.id, email, success: false, ip, userAgent });
+      return reply.code(403).send({ error: 'This account has been suspended. Contact the admin at jasonsun2009@yeah.net.' });
+    }
+
+    // Deactivated account: logging back in restores it (unless the 30-day grace expired).
+    const deactivatedAt = getDeactivatedAt(user.id);
+    if (deactivatedAt) {
+      if (Date.now() - new Date(deactivatedAt).getTime() > GRACE_MS) {
+        deleteUserWithFiles(user.id);
+        return reply.code(401).send({ error: 'This account was deactivated over 30 days ago and has been deleted.' });
+      }
+      clearDeactivated(user.id);
+    }
+
+    promoteIfAdmin(user.id, email);
+    logLogin({ userId: user.id, email, success: true, ip, userAgent });
+    const response: AuthResponse = { token: signToken(user, getTokenVersion(user.id)), user: getUserById(user.id)! };
     return response;
   });
 

@@ -9,6 +9,7 @@ import { GroupDetailPage } from './pages/GroupDetailPage';
 import { UserProfilePage } from './pages/UserProfilePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AuthPage } from './pages/AuthPage';
+import { AdminPage } from './pages/AdminPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { ConductPage } from './pages/ConductPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -26,6 +27,7 @@ export function AppRoutes() {
         <Route path="/users/:username" element={<UserProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/conduct" element={<ConductPage />} />
         <Route path="*" element={<NotFoundPage />} />

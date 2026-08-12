@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { UserAvatar } from '@/components/generated/UserAvatar';
+import { AccountSafetySection } from '@/components/settings/AccountSafetySection';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { cn } from '@/lib/utils';
@@ -213,6 +214,10 @@ export function SettingsPage() {
           </div>
         </form>
       </section>
+
+      <Separator className="my-8" />
+
+      <AccountSafetySection />
     </div>
   );
 }

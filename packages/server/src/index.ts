@@ -5,13 +5,15 @@ import multipart from '@fastify/multipart';
 import staticPlugin from '@fastify/static';
 import { config } from './config.js';
 import { authOnRequest } from './auth.js';
-import { closeDb } from './db.js';
+import { closeDb, deleteUsersDeactivatedBefore, seedAdmin } from './db.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerMeRoutes } from './routes/me.js';
 import { registerRepoRoutes } from './routes/repos.js';
 import { registerGroupRoutes } from './routes/groups.js';
 import { registerUserRoutes } from './routes/users.js';
 import { registerHomeRoutes } from './routes/home.js';
 import { registerReportRoutes } from './routes/reports.js';
+import { registerAdminRoutes } from './routes/admin.js';
 
 const app = Fastify({ logger: true, trustProxy: true });
 
@@ -23,11 +25,13 @@ await app.register(multipart, {
 app.addHook('onRequest', authOnRequest);
 
 await registerAuthRoutes(app);
+await registerMeRoutes(app);
 await registerRepoRoutes(app);
 await registerGroupRoutes(app);
 await registerUserRoutes(app);
 await registerHomeRoutes(app);
 await registerReportRoutes(app);
+await registerAdminRoutes(app);
 
 // Uploaded files are served from /uploads/*. decorateReply is off because the
 // SPA static registration below owns the reply.sendFile decorator.
@@ -49,6 +53,15 @@ app.setNotFoundHandler((req, reply) => {
   }
   return reply.code(404).send({ error: `Not found (build the frontend with npm run build to serve it here)` });
 });
+
+// Ensure the owner's admin account exists, then start the 30-day cleanup for
+// deactivated accounts (they are deleted if never signed into again).
+seedAdmin();
+const cleanupJob = setInterval(() => {
+  const deleted = deleteUsersDeactivatedBefore(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+  if (deleted > 0) app.log.info(`Cleaned up ${deleted} deactivated account(s)`);
+}, 60 * 60 * 1000);
+cleanupJob.unref();
 
 const handleShutdown = async (signal: string) => {
   app.log.info(`Received ${signal}, shutting down`);
