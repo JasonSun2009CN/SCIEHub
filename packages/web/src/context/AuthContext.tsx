@@ -7,6 +7,9 @@ interface AuthContextValue {
   user: User | null;
   token: string | null;
   loading: boolean;
+  /** True right after a brand-new registration — shows the welcome/guidelines banner. */
+  showWelcome: boolean;
+  dismissWelcome: () => void;
   login: (email: string, password: string) => Promise<User>;
   register: (input: { username: string; nickname: string; email: string; password: string }) => Promise<User>;
   logout: () => void;
@@ -20,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setTokenState] = useState<string | null>(() => getToken());
   const [loading, setLoading] = useState<boolean>(() => Boolean(getToken()));
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -74,15 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         json: input,
       });
       applyAuth(data.token, data.user);
+      setShowWelcome(true); // new user — point them at guidelines & contributing
       return data.user;
     },
     [applyAuth],
   );
 
+  const dismissWelcome = useCallback(() => setShowWelcome(false), []);
+
   const logout = useCallback(() => {
     setToken(null);
     setTokenState(null);
     setUser(null);
+    setShowWelcome(false);
     queryClient.clear();
   }, [queryClient]);
 
@@ -92,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ user, token, loading, showWelcome, dismissWelcome, login, register, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );
