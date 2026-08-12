@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -196,15 +197,15 @@ export function SettingsPage() {
         <form onSubmit={onSubmitPassword} className="mt-4 max-w-md space-y-4">
           <div className="space-y-2">
             <Label htmlFor="old-pass">Current password</Label>
-            <Input id="old-pass" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required />
+            <PasswordInput id="old-pass" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="new-pass">New password</Label>
-            <Input id="new-pass" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+            <PasswordInput id="new-pass" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-pass">Confirm new password</Label>
-            <Input id="confirm-pass" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+            <PasswordInput id="confirm-pass" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
           </div>
           <div className="flex justify-end">
             <Button type="submit" disabled={passwordMutation.isPending || !oldPassword || !newPassword || !confirmPassword}>

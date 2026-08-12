@@ -4,6 +4,7 @@ import { FaEnvelope, FaExclamationTriangle, FaLock, FaSpinner, FaUser } from 're
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApiError } from '@/lib/api';
@@ -47,16 +48,28 @@ function Field({ icon, label, id, type, value, onChange, placeholder, autoComple
       <Label htmlFor={id}>{label}</Label>
       <div className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{icon}</span>
-        <Input
-          id={id}
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-          className="pl-9"
-          required
-        />
+        {type === 'password' ? (
+          <PasswordInput
+            id={id}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            autoComplete={autoComplete}
+            className="pl-9"
+            required
+          />
+        ) : (
+          <Input
+            id={id}
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            autoComplete={autoComplete}
+            className="pl-9"
+            required
+          />
+        )}
       </div>
     </div>
   );
