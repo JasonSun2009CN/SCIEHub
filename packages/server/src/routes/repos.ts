@@ -88,6 +88,12 @@ export async function registerRepoRoutes(app: FastifyInstance): Promise<void> {
     if (!repo) return reply.code(404).send({ error: 'Repository not found' });
     if (repo.ownerId !== authUser.id) return reply.code(403).send({ error: 'Only the owner can edit this repository' });
     const body = (req.body ?? {}) as { name?: string; description?: string; categoryId?: string; tags?: string };
+    if (typeof body.name === 'string' && (body.name.trim().length < 2 || body.name.trim().length > 80)) {
+      return reply.code(400).send({ error: 'Repository name must be 2–80 characters' });
+    }
+    if (body.categoryId && !CATEGORIES.some((c) => c.id === body.categoryId)) {
+      return reply.code(400).send({ error: 'Please choose a valid category' });
+    }
     const tags = typeof body.tags === 'string' ? body.tags.split(',').map((t) => t.trim()).filter(Boolean).slice(0, 8) : undefined;
     const updated = updateRepo(id, {
       name: typeof body.name === 'string' ? body.name.trim() : undefined,

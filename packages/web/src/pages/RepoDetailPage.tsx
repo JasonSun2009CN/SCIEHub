@@ -7,6 +7,7 @@ import {
   FaCloudUploadAlt,
   FaComment,
   FaDownload,
+  FaEdit,
   FaEye,
   FaFlag,
   FaFolder,
@@ -16,11 +17,13 @@ import {
   FaSpinner,
   FaTrash,
 } from 'react-icons/fa';
-import { formatBytes, type Comment, type Group, type RepoFile, type Repository } from '@sciehub/shared';
+import { CATEGORIES, formatBytes, type Comment, type Group, type RepoFile, type Repository } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -49,6 +52,11 @@ export function RepoDetailPage() {
   const [comment, setComment] = useState('');
   const [shareGroup, setShareGroup] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editTags, setEditTags] = useState('');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['repo', id],
@@ -120,6 +128,26 @@ export function RepoDetailPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      api(`/repos/${id}`, {
+        method: 'PATCH',
+        json: {
+          name: editName.trim(),
+          description: editDesc.trim(),
+          categoryId: editCategory,
+          tags: editTags,
+        },
+      }),
+    onSuccess: () => {
+      setEditOpen(false);
+      invalidateRepo();
+      queryClient.invalidateQueries({ queryKey: ['home'] });
+      toast('Repository updated', 'success');
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not update repository', 'error'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => api(`/repos/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -179,6 +207,14 @@ export function RepoDetailPage() {
   const { repo, files, related } = data;
   const isOwner = repo.isOwner;
 
+  const openEdit = () => {
+    setEditName(repo.name);
+    setEditDesc(repo.description);
+    setEditCategory(repo.categoryId);
+    setEditTags(repo.tags.join(', '));
+    setEditOpen(true);
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <PageMeta title={repo.name} description={repo.description} />
@@ -237,6 +273,11 @@ export function RepoDetailPage() {
                   <Link to={`/upload?repo=${repo.id}`}>
                     <FaCloudUploadAlt className="h-4 w-4" /> Upload files
                   </Link>
+                </Button>
+              )}
+              {isOwner && (
+                <Button variant="outline" onClick={openEdit}>
+                  <FaEdit className="h-4 w-4" /> Edit
                 </Button>
               )}
               {isOwner && (
@@ -508,6 +549,69 @@ export function RepoDetailPage() {
             <Button variant="danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending && <FaSpinner className="h-4 w-4 animate-spin" />}
               Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit repository */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit repository</DialogTitle>
+            <DialogDescription>Update the name, description, category or tags.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-repo-name">Name *</Label>
+              <Input
+                id="edit-repo-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Repository name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-repo-desc">Description</Label>
+              <Textarea
+                id="edit-repo-desc"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                rows={3}
+                placeholder="What does this repository cover?"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={editCategory} onValueChange={setEditCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-repo-tags">Tags</Label>
+              <Input
+                id="edit-repo-tags"
+                value={editTags}
+                onChange={(e) => setEditTags(e.target.value)}
+                placeholder="math, notes, exam — comma separated"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => updateMutation.mutate()}
+              disabled={!editName.trim() || !editCategory || updateMutation.isPending}
+            >
+              {updateMutation.isPending && <FaSpinner className="h-4 w-4 animate-spin" />}
+              Save changes
             </Button>
           </DialogFooter>
         </DialogContent>
