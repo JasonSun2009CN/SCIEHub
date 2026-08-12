@@ -16,7 +16,10 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-xl animate-fade-in-up',
+        // Note: use an opacity-only animation here — a transform-based entrance
+        // would override the -translate-x/y-1/2 centering and push the dialog
+        // off to the bottom-right of the screen.
+        'fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-xl animate-fade-in',
         className,
       )}
       {...props}

@@ -104,6 +104,7 @@ packages/
 | `/users/:username` | Public profile — repositories / favorites / groups |
 | `/leaderboard` | Top contributors by files shared + total size |
 | `/conduct` | Community guidelines |
+| `/contributing` | Contribute — send suggestions, report issues, open PRs |
 | `/admin` | Admin console (admins only) |
 | `/settings` | Profile, avatar, notification prefs, password |
 | `/auth` | Sign in / register |

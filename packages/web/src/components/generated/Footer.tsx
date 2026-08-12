@@ -8,6 +8,7 @@ const PLATFORM_LINKS = [
   { to: '/groups', label: 'Groups' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/conduct', label: 'Community guidelines' },
+  { to: '/contributing', label: 'Contribute' },
   { to: '/upload', label: 'Upload' },
 ];
 

@@ -12,6 +12,7 @@ import { AuthPage } from './pages/AuthPage';
 import { AdminPage } from './pages/AdminPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { ConductPage } from './pages/ConductPage';
+import { ContributingPage } from './pages/ContributingPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -30,6 +31,7 @@ export function AppRoutes() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/conduct" element={<ConductPage />} />
+        <Route path="/contributing" element={<ContributingPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
