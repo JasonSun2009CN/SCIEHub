@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FaBan, FaBook, FaCopyright, FaFlag, FaHeart, FaShieldAlt, FaUserSlash } from 'react-icons/fa';
+import { FaBan, FaBook, FaCoins, FaCopyright, FaFlag, FaHeart, FaShieldAlt, FaStar, FaUserSlash } from 'react-icons/fa';
 import { PageMeta } from '@/components/common/PageMeta';
 
 const RULES = [
@@ -26,6 +26,18 @@ const RULES = [
     title: 'No spam or misleading content',
     description:
       'Keep repositories genuine. No clickbait titles, scams, self-promotion, or material that doesn’t match its description.',
+  },
+  {
+    Icon: FaCoins,
+    title: 'Fair pricing',
+    description:
+      'Price paid resources honestly and deliver exactly what the description promises. Overpriced, bait-and-switch or fake listings are treated as violations.',
+  },
+  {
+    Icon: FaStar,
+    title: 'Honest reviews & refunds',
+    description:
+      'Review only resources you actually bought, and review honestly. Sellers can refund a paid order to make things right; buyers should reach out before escalating a report.',
   },
   {
     Icon: FaShieldAlt,
@@ -71,15 +83,17 @@ export function ConductPage() {
 
       <div className="mt-8 rounded-lg border border-border bg-surface p-6">
         <h2 className="flex items-center gap-2 font-semibold">
-          <FaBook className="h-4 w-4 text-accent" /> One more thing about files
+          <FaBook className="h-4 w-4 text-accent" /> One more thing about files & trading
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Files you upload are visible to everyone who can access your repository. Be thoughtful about what you share and
-          who it could help (or harm). Remember that downloads are tracked — every file you contribute becomes part of the
-          community resource.
+          who it could help (or harm). Downloads are tracked, and paid resources stay locked until a buyer pays — then
+          the buyer keeps access and the seller earns 90% of the price (10% platform fee). Buyers can review what they
+          purchased, and sellers can issue refunds when something is wrong.
         </p>
-        <div className="mt-4">
-          <Link to="/feed" className="text-accent hover:underline">Browse repositories →</Link>
+        <div className="mt-4 flex flex-wrap gap-4">
+          <Link to="/marketplace" className="text-accent hover:underline">Browse the marketplace →</Link>
+          <Link to="/upload" className="text-accent hover:underline">Upload & sell a resource →</Link>
         </div>
       </div>
 

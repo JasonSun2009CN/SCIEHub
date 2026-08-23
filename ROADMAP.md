@@ -2,9 +2,9 @@
 
 动态网站全栈项目：React 前端 + Node/Fastify 后端 + SQLite，monorepo 管理。目标：尽快完成全部模块，部署到服务器后直接可用。MVP 阶段不写自动化测试，以手动验证为准。
 
-**Status: ✅ All phases complete**（含 Phase 7 迭代二，verified via production build + end-to-end API tests + headless browser render）。
+**Status: ✅ All phases complete**（含 Phase 7 迭代二与 Phase 11 市场化，verified via production build + typecheck + end-to-end API tests + headless browser render）。
 
-> Phase 0–6 为原始资源/小组模型；Phase 7 依据后续需求迭代为「Repository 模型 + 社区功能」。
+> Phase 0–6 为原始资源/小组模型；Phase 7 迭代为「Repository 模型 + 社区功能」；Phase 11 迭代为「资源共享/售卖市场」。
 
 ## Phase 0 — 工程脚手架 ✅
 - [x] monorepo 落地：packages/web + packages/server + packages/shared（npm workspaces），共享类型起步
@@ -74,6 +74,16 @@
 - [x] 注销两种：停用（30 天内登录恢复，否则定时清理删除）/ 永久删除（密码确认）
 - [x] 管理员新增 + 让位（step down）；最后管理员不可移除/停用/自删
 - [x] 验证：种子管理员、登录记录、revoke、停用恢复、30 天过期删除、密码删除、最后管理员守卫、让位全通过
+
+## Phase 11 — 资源市场化（资源共享/售卖转型）✅
+- [x] 数据模型：Repository 增加 pricing_type / price / currency / total_sales / total_revenue；新增 orders / purchases / reviews / wallet_transactions 表 + User 钱包余额
+- [x] 定价：创建/编辑仓库可设置 Free 或付费（价格 ¥/$，上限 9,999），共享层 `formatPrice`/`currencySymbol`/`PLATFORM_FEE_RATE` 等常量
+- [x] 交易 API：checkout（创建订单）→ 钱包支付 → 生成 purchase + 卖方到账；卖方可退款、管理员可退款/充值钱包
+- [x] 订单/钱包：`/api/users/me/orders`（买方/卖方双视角 + 状态筛选）、`/api/users/me/wallet`、钱包流水、购买列表
+- [x] 评价系统：购买者（或免费资源 owner）可 1-5 星评价 + 文字，可编辑/删除，聚合平均分
+- [x] 前端页面：Checkout / Orders / Wallet 三个新页面；仓库详情加价格面板 + 下载门控 + 评价区；Feed 加定价筛选与价格/销量/评分排序；Home 改市场 Hero + 热销 + 免费资源；个人主页加"已购"页签；榜单加"销量榜"；管理端加 Orders Tab + 钱包充值
+- [x] 文档：README / ROADMAP / design / ADR / HANDOFF 全面更新 + 新增 `docs/USER_MANUAL.md` 用户手册
+- [x] 验证：全量 typecheck（shared + server + web）通过
 
 ## 验证记录
 - 迭代一全链路 API 测试通过：注册/登录/鉴权、上传（multipart 落盘）、下载、收藏、评论、加入/退出小组、建组/改组/删组、越权拦截

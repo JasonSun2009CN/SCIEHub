@@ -3,7 +3,9 @@ import type { HomeData } from '@sciehub/shared';
 import {
   getLeaderboard,
   getStats,
+  getTopSellers,
   listActiveGroups,
+  listFreeRepos,
   listHotRepos,
   listRecentRepos,
   searchAll,
@@ -18,6 +20,8 @@ export async function registerHomeRoutes(app: FastifyInstance): Promise<void> {
       activeGroups: listActiveGroups(6, currentUserId),
       recentRepos: listRecentRepos(6, currentUserId),
       topContributors: getLeaderboard(5),
+      topSellers: getTopSellers(5),
+      freeRepos: listFreeRepos(6, currentUserId),
     };
     return data;
   });
@@ -25,7 +29,9 @@ export async function registerHomeRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/leaderboard', async (req) => {
     const q = req.query as Record<string, string | undefined>;
     const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 100);
-    return { items: getLeaderboard(limit) };
+    const type = q.type === 'sales' ? 'sales' : 'contributors';
+    const items = type === 'sales' ? getTopSellers(limit) : getLeaderboard(limit);
+    return { items, type };
   });
 
   app.get('/api/search', async (req, reply) => {

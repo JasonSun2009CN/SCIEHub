@@ -1,7 +1,20 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FaArrowRight, FaFire, FaSearch, FaShareAlt, FaTrophy, FaUsers } from 'react-icons/fa';
-import { formatBytes, type HomeData } from '@sciehub/shared';
+import {
+  FaArrowRight,
+  FaCartPlus,
+  FaCoins,
+  FaDollarSign,
+  FaDownload,
+  FaFire,
+  FaSearch,
+  FaShieldAlt,
+  FaStar,
+  FaTrophy,
+  FaUsers,
+  FaWallet,
+} from 'react-icons/fa';
+import { formatBytes, formatPrice, PLATFORM_FEE_RATE, type HomeData } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
@@ -14,19 +27,41 @@ import { formatNumber } from '@/lib/utils';
 
 const FEATURES = [
   {
-    Icon: FaShareAlt,
-    title: 'Share repositories',
-    description: 'Build your own study repository — multiple files, one organised home — and share it with classmates.',
+    Icon: FaCartPlus,
+    title: 'Buy premium resources',
+    description:
+      'Pay once, keep forever. Hand-picked study notes, past papers, and guides — all from trusted sellers in the community.',
+  },
+  {
+    Icon: FaCoins,
+    title: 'Sell & earn rewards',
+    description:
+      `Set a fair price, publish your work, and get paid. Platform fee is only ${Math.round(
+        PLATFORM_FEE_RATE * 100,
+      )}% — you keep the rest.`,
+  },
+  {
+    Icon: FaDownload,
+    title: 'Free resources, always',
+    description:
+      'Millions of free notes and materials shared by students. No paywalls, no sign-up tricks — just knowledge.',
   },
   {
     Icon: FaUsers,
     title: 'Study groups',
-    description: 'Join subject communities, request membership and discover repositories shared by members.',
+    description: 'Join subject communities, request membership, and discover repositories shared by members.',
   },
   {
     Icon: FaSearch,
-    title: 'Smart search',
-    description: 'Search across repositories, files and groups to find exactly the material you need, fast.',
+    title: 'Smart search & filters',
+    description:
+      'Search across repos and groups, then filter by price range, ratings, and category to find exactly what you need.',
+  },
+  {
+    Icon: FaShieldAlt,
+    title: 'Buyer protection',
+    description:
+      'Verified sellers, purchase history, honest reviews, and a fair refund policy when the content is misrepresented.',
   },
 ];
 
@@ -79,46 +114,79 @@ export function HomePage() {
   return (
     <div>
       <PageMeta
-        title="Home"
-        description="SCIEHub — build study repositories, share materials, join subject groups and excel. For international high school students."
+        title="Discover · Buy · Sell Top Study Resources"
+        description="SCIEHub Marketplace — buy premium study notes, sell your own work, and share free materials with the international high school community."
       />
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-border">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgb(56_189_248_/_0.12),transparent_60%)]" aria-hidden />
-        <div className="relative mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8">
-          <Badge className="animate-fade-in-up mb-6">Built for international high school students</Badge>
-          <h1 className="animate-fade-in-up mx-auto max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl" style={{ animationDelay: '80ms' }}>
-            Share, Collaborate,
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgb(56_189_248_/_0.14),transparent_60%)]"
+          aria-hidden
+        />
+        <div className="relative mx-auto max-w-7xl px-4 py-18 text-center sm:px-6 sm:py-24 lg:px-8">
+          <Badge className="animate-fade-in-up mb-6 border-accent/30 bg-accent/10 text-accent">
+            <FaCoins className="mr-1 h-3 w-3" aria-hidden />
+            SCIEHub Marketplace — share free or sell your work
+          </Badge>
+          <h1
+            className="animate-fade-in-up mx-auto max-w-4xl text-4xl font-extrabold tracking-tight sm:text-6xl"
+            style={{ animationDelay: '80ms' }}
+          >
+            Discover · Buy · Sell
+            <br />
             <span className="bg-gradient-to-r from-accent via-sky-400 to-success bg-clip-text text-transparent">
-              {' '}Excel.
+              Top Study Resources.
             </span>
           </h1>
-          <p className="animate-fade-in-up mx-auto mt-6 max-w-xl text-lg text-muted-foreground" style={{ animationDelay: '160ms' }}>
-            Create your own study repositories, upload multiple files, and share them with your subject groups.
+          <p
+            className="animate-fade-in-up mx-auto mt-6 max-w-2xl text-lg text-muted-foreground"
+            style={{ animationDelay: '160ms' }}
+          >
+            Find the exact notes, past papers and guides you need — for free or at a fair price.
+            Publish your own work and earn from every sale.
           </p>
-          <div className="animate-fade-in-up mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: '240ms' }}>
+          <div
+            className="animate-fade-in-up mt-8 flex flex-wrap items-center justify-center gap-3"
+            style={{ animationDelay: '240ms' }}
+          >
             <Button size="lg" asChild>
-              <Link to="/feed">
-                Explore repositories <FaArrowRight className="h-4 w-4" />
+              <Link to="/marketplace">
+                Browse marketplace <FaArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link to="/upload">Create a repository</Link>
+              <Link to="/upload">
+                <FaDollarSign className="h-4 w-4" />
+                Upload & Sell
+              </Link>
             </Button>
           </div>
 
           {data && (
-            <div className="animate-fade-in-up mx-auto mt-14 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-5" style={{ animationDelay: '320ms' }}>
+            <div
+              className="animate-fade-in-up mx-auto mt-14 grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6"
+              style={{ animationDelay: '320ms' }}
+            >
               {[
-                { label: 'Repositories', value: data.stats.repos },
+                { label: 'Resources', value: data.stats.repos, accent: true },
                 { label: 'Files', value: data.stats.files },
-                { label: 'Study groups', value: data.stats.groups },
+                { label: 'Free repos', value: data.stats.freeRepos },
                 { label: 'Students', value: data.stats.users },
-                { label: 'Downloads', value: data.stats.downloads },
+                { label: 'Sales', value: data.stats.totalSales },
+                { label: 'Paid out', value: data.stats.totalRevenue, money: true },
               ].map((stat) => (
-                <div key={stat.label} className="rounded-lg border border-border bg-surface px-4 py-3">
-                  <div className="text-xl font-bold text-accent sm:text-2xl">{formatNumber(stat.value)}</div>
+                <div
+                  key={stat.label}
+                  className="rounded-lg border border-border bg-surface px-4 py-3 text-left"
+                >
+                  <div
+                    className={`text-xl font-bold sm:text-2xl ${
+                      stat.accent ? 'text-accent' : 'text-foreground'
+                    } tabular-nums`}
+                  >
+                    {stat.money ? `¥${formatNumber(stat.value)}` : formatNumber(stat.value)}
+                  </div>
                   <div className="text-xs text-muted-foreground">{stat.label}</div>
                 </div>
               ))}
@@ -127,92 +195,203 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Trending repos */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FaFire className="h-5 w-5 text-warning" aria-hidden />
-            <h2 className="text-xl font-bold sm:text-2xl">Trending repositories</h2>
+      {/* Top sellers + free resources row */}
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr]">
+          {/* Trending / Hot */}
+          <div>
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FaFire className="h-5 w-5 text-warning" aria-hidden />
+                <h2 className="text-xl font-bold sm:text-2xl">Trending now</h2>
+              </div>
+              <Link to="/marketplace" className="text-sm font-medium text-accent hover:underline">
+                View all →
+              </Link>
+            </div>
+            {isLoading || !data ? (
+              <RepoGridSkeleton />
+            ) : (
+              <div className="grid gap-5 sm:grid-cols-2">
+                {data.hotRepos.slice(0, 4).map((repo, i) => (
+                  <RepositoryCard key={repo.id} repo={repo} index={i} showGroups={false} />
+                ))}
+              </div>
+            )}
           </div>
-          <Link to="/feed" className="text-sm font-medium text-accent hover:underline">
-            View all →
-          </Link>
+
+          {/* Top sellers */}
+          <div>
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FaTrophy className="h-5 w-5 text-warning" aria-hidden />
+                <h2 className="text-xl font-bold sm:text-2xl">Top sellers</h2>
+              </div>
+              <Link to="/leaderboard?type=sales" className="text-sm font-medium text-accent hover:underline">
+                Full ranking →
+              </Link>
+            </div>
+            {isLoading || !data ? (
+              <ContributorsSkeleton />
+            ) : (data.topSellers ?? []).length === 0 ? (
+              <p className="rounded-lg border border-border bg-surface py-12 text-center text-sm text-muted-foreground">
+                No sales yet — be the first seller!
+              </p>
+            ) : (
+              <div className="space-y-2 rounded-lg border border-border bg-surface p-4">
+                {(data.topSellers ?? []).slice(0, 5).map((entry, i) => (
+                  <Link
+                    key={entry.user.id}
+                    to={`/users/${entry.user.username}`}
+                    className="animate-fade-in-up flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-surface-2"
+                    style={{ animationDelay: `${i * 60}ms` }}
+                  >
+                    <span className="w-6 text-center text-xs font-bold text-muted-foreground">
+                      #{i + 1}
+                    </span>
+                    <UserAvatar
+                      nickname={entry.user.nickname}
+                      username={entry.user.username}
+                      avatarUrl={entry.user.avatarUrl}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{entry.user.nickname}</div>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 text-success">
+                          <FaWallet className="h-3 w-3" />
+                          {(entry.totalRevenue ?? 0) > 0
+                            ? formatPrice(entry.totalRevenue!, 'CNY').replace('CN¥', '¥')
+                            : 'earnings'}
+                        </span>
+                        <span>·</span>
+                        <span>{formatNumber(entry.totalSales ?? 0)} sales</span>
+                      </div>
+                    </div>
+                    {(entry.averageRating ?? 0) > 0 && (
+                      <span className="flex items-center gap-1 text-xs text-warning">
+                        <FaStar className="h-3 w-3 fill-warning/80" />
+                        <span className="font-semibold tabular-nums">
+                          {Number(entry.averageRating).toFixed(1)}
+                        </span>
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-        {isLoading || !data ? (
-          <RepoGridSkeleton />
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {data.hotRepos.map((repo, i) => (
-              <RepositoryCard key={repo.id} repo={repo} index={i} />
-            ))}
-          </div>
-        )}
       </section>
 
-      {/* Top contributors */}
+      {/* Free resources */}
       <section className="border-y border-border bg-surface/40">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FaTrophy className="h-5 w-5 text-warning" aria-hidden />
-              <h2 className="text-xl font-bold sm:text-2xl">Top contributors</h2>
+              <FaDownload className="h-5 w-5 text-success" aria-hidden />
+              <h2 className="text-xl font-bold sm:text-2xl">Free for everyone</h2>
+              <Badge variant="outline" className="ml-1 border-success/40 text-success">
+                No purchase needed
+              </Badge>
             </div>
-            <Link to="/leaderboard" className="text-sm font-medium text-accent hover:underline">
-              Full leaderboard →
+            <Link
+              to="/marketplace?pricingType=free"
+              className="text-sm font-medium text-accent hover:underline"
+            >
+              Browse all free →
             </Link>
           </div>
           {isLoading || !data ? (
-            <ContributorsSkeleton />
-          ) : data.topContributors.length === 0 ? (
-            <p className="rounded-lg border border-border bg-surface py-12 text-center text-sm text-muted-foreground">
-              No contributions yet — be the first to share!
-            </p>
+            <RepoGridSkeleton />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-              {data.topContributors.map((entry, i) => (
-                <div key={entry.user.id} className="animate-fade-in-up rounded-lg border border-border bg-surface p-5 text-center" style={{ animationDelay: `${i * 60}ms` }}>
-                  <div className="text-xs font-semibold text-muted-foreground">#{i + 1}</div>
-                  <div className="mt-2 flex justify-center">
-                    <UserAvatar nickname={entry.user.nickname} username={entry.user.username} avatarUrl={entry.user.avatarUrl} size="lg" />
-                  </div>
-                  <Link to={`/users/${entry.user.username}`} className="mt-2 block truncate text-sm font-semibold hover:text-accent">
-                    {entry.user.nickname}
-                  </Link>
-                  <div className="mt-1 text-sm font-bold text-accent">{entry.fileCount} files</div>
-                  <div className="text-xs text-muted-foreground">{formatBytes(entry.totalBytes)} shared</div>
-                </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {(data.freeRepos ?? []).map((repo, i) => (
+                <RepositoryCard key={repo.id} repo={repo} index={i} />
               ))}
             </div>
           )}
         </div>
       </section>
 
-      {/* Active groups */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      {/* Top contributors */}
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FaUsers className="h-5 w-5 text-accent" aria-hidden />
-            <h2 className="text-xl font-bold sm:text-2xl">Active study groups</h2>
+            <h2 className="text-xl font-bold sm:text-2xl">Top sharers</h2>
           </div>
-          <Link to="/groups" className="text-sm font-medium text-accent hover:underline">
-            View all →
+          <Link to="/leaderboard" className="text-sm font-medium text-accent hover:underline">
+            Full leaderboard →
           </Link>
         </div>
         {isLoading || !data ? (
-          <RepoGridSkeleton />
+          <ContributorsSkeleton />
+        ) : data.topContributors.length === 0 ? (
+          <p className="rounded-lg border border-border bg-surface py-12 text-center text-sm text-muted-foreground">
+            No contributions yet — be the first to share!
+          </p>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {data.activeGroups.map((group, i) => (
-              <GroupCard key={group.id} group={group} index={i} />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {data.topContributors.map((entry, i) => (
+              <div
+                key={entry.user.id}
+                className="animate-fade-in-up rounded-lg border border-border bg-surface p-5 text-center"
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
+                <div className="text-xs font-semibold text-muted-foreground">#{i + 1}</div>
+                <div className="mt-2 flex justify-center">
+                  <UserAvatar
+                    nickname={entry.user.nickname}
+                    username={entry.user.username}
+                    avatarUrl={entry.user.avatarUrl}
+                    size="lg"
+                  />
+                </div>
+                <Link
+                  to={`/users/${entry.user.username}`}
+                  className="mt-2 block truncate text-sm font-semibold hover:text-accent"
+                >
+                  {entry.user.nickname}
+                </Link>
+                <div className="mt-1 text-sm font-bold text-accent">{entry.fileCount} files</div>
+                <div className="text-xs text-muted-foreground">{formatBytes(entry.totalBytes)} shared</div>
+              </div>
             ))}
           </div>
         )}
       </section>
 
+      {/* Active groups */}
+      <section className="border-t border-border bg-surface/40">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FaUsers className="h-5 w-5 text-accent" aria-hidden />
+              <h2 className="text-xl font-bold sm:text-2xl">Active study groups</h2>
+            </div>
+            <Link to="/groups" className="text-sm font-medium text-accent hover:underline">
+              View all →
+            </Link>
+          </div>
+          {isLoading || !data ? (
+            <RepoGridSkeleton />
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {data.activeGroups.map((group, i) => (
+                <GroupCard key={group.id} group={group} index={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Features */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <h2 className="text-center text-xl font-bold sm:text-2xl">Everything you need to study smarter</h2>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
+        <h2 className="text-center text-xl font-bold sm:text-2xl">
+          A marketplace built for students, by students
+        </h2>
+        <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ Icon, title, description }, i) => (
             <div
               key={title}
@@ -232,18 +411,25 @@ export function HomePage() {
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-10 text-center sm:p-16">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgb(56_189_248_/_0.14),transparent_65%)]" aria-hidden />
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgb(56_189_248_/_0.14),transparent_65%)]"
+            aria-hidden
+          />
           <div className="relative">
-            <h2 className="text-2xl font-bold sm:text-3xl">Ready to share what you know?</h2>
+            <h2 className="text-2xl font-bold sm:text-3xl">Ready to sell what you know?</h2>
             <p className="mx-auto mt-3 max-w-lg text-muted-foreground">
-              Create a repository, upload your notes, and share it with your study groups. Every contribution makes the community stronger.
+              Publish a resource today, set your own price, and start earning from every download.
+              Your notes could help thousands of students — and pay for your next semester.
             </p>
-            <div className="mt-6 flex justify-center gap-3">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button size="lg" asChild>
-                <Link to="/auth">Get started</Link>
+                <Link to="/upload">
+                  <FaDollarSign className="h-4 w-4" />
+                  Start selling
+                </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link to="/upload">Create a repository</Link>
+                <Link to="/marketplace">Browse marketplace</Link>
               </Button>
             </div>
           </div>

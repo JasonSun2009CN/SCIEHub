@@ -5,6 +5,7 @@ import {
   FaArrowLeft,
   FaCheck,
   FaCloudUploadAlt,
+  FaCoins,
   FaComment,
   FaDownload,
   FaEdit,
@@ -13,11 +14,28 @@ import {
   FaFolder,
   FaHeart,
   FaLink,
+  FaLock,
   FaPaperclip,
+  FaShoppingCart,
   FaSpinner,
+  FaStar,
   FaTrash,
 } from 'react-icons/fa';
-import { CATEGORIES, formatBytes, type Comment, type Group, type RepoFile, type Repository } from '@sciehub/shared';
+import {
+  CATEGORIES,
+  CURRENCIES,
+  MAX_FILE_PRICE,
+  PLATFORM_FEE_RATE,
+  formatBytes,
+  formatPrice,
+  type Comment,
+  type Currency,
+  type Group,
+  type PricingType,
+  type RepoFile,
+  type Repository,
+  type Review,
+} from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
@@ -43,6 +61,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { cn, formatDate, formatNumber, timeAgo } from '@/lib/utils';
 
+interface RepoDetailData {
+  repo: Repository;
+  files: RepoFile[];
+  related: Repository[];
+  reviews: Review[];
+  purchaseState: { isOwner: boolean; isPurchased: boolean; canReview: boolean };
+}
+
 export function RepoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -57,10 +83,19 @@ export function RepoDetailPage() {
   const [editDesc, setEditDesc] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editTags, setEditTags] = useState('');
+  const [editPricingType, setEditPricingType] = useState<PricingType>('free');
+  const [editPrice, setEditPrice] = useState('');
+  const [editCurrency, setEditCurrency] = useState<Currency>('CNY');
+  const [editPreviewImageUrl, setEditPreviewImageUrl] = useState('');
+  // Review form
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewContent, setReviewContent] = useState('');
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['repo', id],
-    queryFn: () => api<{ repo: Repository; files: RepoFile[]; related: Repository[] }>(`/repos/${id}`),
+    queryFn: () => api<RepoDetailData>(`/repos/${id}`),
     enabled: Boolean(id),
   });
 
@@ -137,15 +172,49 @@ export function RepoDetailPage() {
           description: editDesc.trim(),
           categoryId: editCategory,
           tags: editTags,
+          pricingType: editPricingType,
+          price: editPricingType === 'paid' ? Number(editPrice) : 0,
+          currency: editCurrency,
+          previewImageUrl: editPreviewImageUrl.trim() || null,
         },
       }),
     onSuccess: () => {
       setEditOpen(false);
       invalidateRepo();
       queryClient.invalidateQueries({ queryKey: ['home'] });
+      queryClient.invalidateQueries({ queryKey: ['repos'] });
       toast('Repository updated', 'success');
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not update repository', 'error'),
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: (payload: { rating: number; title: string; content: string }) => {
+      const body = { rating: payload.rating, title: payload.title, content: payload.content };
+      return editingReview
+        ? api<{ review: Review }>(`/repos/${id}/reviews/${editingReview.id}`, { method: 'PATCH', json: body })
+        : api<{ review: Review }>(`/repos/${id}/reviews`, { method: 'POST', json: body });
+    },
+    onSuccess: () => {
+      setEditingReview(null);
+      setReviewRating(5);
+      setReviewTitle('');
+      setReviewContent('');
+      invalidateRepo();
+      queryClient.invalidateQueries({ queryKey: ['reviews', id] });
+      toast(editingReview ? 'Review updated' : 'Review submitted', 'success');
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not submit review', 'error'),
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: (reviewId: string) => api(`/repos/${id}/reviews/${reviewId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      invalidateRepo();
+      queryClient.invalidateQueries({ queryKey: ['reviews', id] });
+      toast('Review deleted', 'info');
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not delete review', 'error'),
   });
 
   const deleteMutation = useMutation({
@@ -204,14 +273,22 @@ export function RepoDetailPage() {
     );
   }
 
-  const { repo, files, related } = data;
-  const isOwner = repo.isOwner;
+  const { repo, files, related, reviews = [], purchaseState } = data;
+  const isOwner = repo.isOwner ?? purchaseState?.isOwner ?? false;
+  const isPurchased = purchaseState?.isPurchased ?? repo.isPurchased ?? false;
+  const canReview = purchaseState?.canReview ?? false;
+  const needsPurchase = repo.pricingType === 'paid' && !isOwner && !isPurchased;
+  const platformFee = repo.pricingType === 'paid' ? repo.price * PLATFORM_FEE_RATE : 0;
 
   const openEdit = () => {
     setEditName(repo.name);
     setEditDesc(repo.description);
     setEditCategory(repo.categoryId);
     setEditTags(repo.tags.join(', '));
+    setEditPricingType(repo.pricingType);
+    setEditPrice(repo.pricingType === 'paid' ? String(repo.price) : '');
+    setEditCurrency(repo.currency);
+    setEditPreviewImageUrl(repo.previewImageUrl ?? '');
     setEditOpen(true);
   };
 
@@ -234,6 +311,13 @@ export function RepoDetailPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge>{repo.categoryName}</Badge>
+                  {repo.pricingType === 'free' ? (
+                    <Badge variant="success">Free</Badge>
+                  ) : (
+                    <Badge variant="outline" className="tabular-nums">
+                      {formatPrice(repo.price, repo.currency)}
+                    </Badge>
+                  )}
                   {repo.tags.slice(0, 3).map((t) => (
                     <Badge key={t} variant="secondary">#{t}</Badge>
                   ))}
@@ -360,8 +444,32 @@ export function RepoDetailPage() {
           {/* Files */}
           <div className="animate-fade-in-up mt-6 rounded-lg border border-border bg-surface p-6" style={{ animationDelay: '120ms' }}>
             <h2 className="mb-4 flex items-center gap-2 font-semibold">
-              <FaPaperclip className="h-4 w-4 text-accent" /> Files ({files.length})
+              <FaPaperclip className="h-4 w-4 text-accent" /> Files ({formatNumber(repo.fileCount)})
             </h2>
+
+            {needsPurchase && (
+              <div className="mb-4 flex items-start gap-3 rounded-md border border-accent/25 bg-accent-subtle px-4 py-3">
+                <FaLock className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                <div className="text-sm">
+                  <p className="font-medium text-foreground">This is a paid resource</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {files.length > 0
+                      ? `You can preview ${files.length} file${files.length === 1 ? '' : 's'}. Buy to unlock all ${
+                          formatNumber(repo.fileCount)
+                        } files for download.`
+                      : `All ${formatNumber(repo.fileCount)} files are locked. Buy to unlock them.`}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="ml-auto shrink-0"
+                  onClick={() => navigate(`/checkout/${repo.id}`)}
+                >
+                  <FaShoppingCart className="h-3.5 w-3.5" /> Buy now
+                </Button>
+              </div>
+            )}
+
             {files.length === 0 ? (
               <div className="rounded-md border border-dashed border-border bg-surface-2 py-12 text-center text-sm text-muted-foreground">
                 No files yet.
@@ -387,13 +495,23 @@ export function RepoDetailPage() {
                     {file.fileType === 'image' && (
                       <img src={file.filePath} alt={file.title} className="h-10 w-14 shrink-0 rounded border border-border object-cover" loading="lazy" />
                     )}
-                    <a
-                      href={`/api/files/${file.id}/download`}
-                      className="shrink-0 rounded-md border border-border p-2 text-muted-foreground transition-colors hover:border-accent hover:text-accent"
-                      aria-label={`Download ${file.title}`}
-                    >
-                      <FaDownload className="h-4 w-4" />
-                    </a>
+                    {needsPurchase && !file.isPreview ? (
+                      <span
+                        className="shrink-0 rounded-md border border-border p-2 text-muted-foreground"
+                        aria-label="Locked file"
+                        title="Buy this resource to unlock the download"
+                      >
+                        <FaLock className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <a
+                        href={`/api/files/${file.id}/download`}
+                        className="shrink-0 rounded-md border border-border p-2 text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+                        aria-label={`Download ${file.title}`}
+                      >
+                        <FaDownload className="h-4 w-4" />
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -468,10 +586,288 @@ export function RepoDetailPage() {
               )}
             </ul>
           </div>
+
+          {/* Reviews */}
+          <div className="animate-fade-in-up mt-6 rounded-lg border border-border bg-surface p-6" style={{ animationDelay: '200ms' }}>
+            <h2 className="mb-4 flex flex-wrap items-center gap-2 font-semibold">
+              <FaStar className="h-4 w-4 text-warning" aria-hidden /> Reviews ({reviews.length})
+              {repo.averageRating > 0 && (
+                <span className="flex items-center gap-1 text-sm font-semibold text-warning">
+                  <FaStar className="h-3.5 w-3.5 fill-warning/80" aria-hidden />
+                  {repo.averageRating.toFixed(1)}
+                </span>
+              )}
+            </h2>
+
+            {canReview ? (
+              <form
+                onSubmit={(e: FormEvent) => {
+                  e.preventDefault();
+                  if (reviewContent.trim()) {
+                    reviewMutation.mutate({
+                      rating: reviewRating,
+                      title: reviewTitle.trim(),
+                      content: reviewContent.trim(),
+                    });
+                  }
+                }}
+                className="mb-6 rounded-md bg-surface-2 p-4"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-medium">
+                    {editingReview ? 'Edit your review' : 'Rate this resource'}
+                  </span>
+                  <div className="flex items-center gap-1" role="radiogroup" aria-label="Rating">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setReviewRating(n)}
+                        aria-label={`${n} star${n === 1 ? '' : 's'}`}
+                        className={cn(
+                          'cursor-pointer text-xl transition-colors',
+                          n <= reviewRating ? 'text-warning' : 'text-muted-foreground/40 hover:text-warning/60',
+                        )}
+                      >
+                        <FaStar className="h-5 w-5" />
+                      </button>
+                    ))}
+                  </div>
+                  {editingReview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingReview(null);
+                        setReviewRating(5);
+                        setReviewTitle('');
+                        setReviewContent('');
+                      }}
+                      className="ml-auto cursor-pointer text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
+                <Input
+                  value={reviewTitle}
+                  onChange={(e) => setReviewTitle(e.target.value)}
+                  placeholder="Short headline (optional)"
+                  className="mt-3 bg-surface"
+                />
+                <Textarea
+                  value={reviewContent}
+                  onChange={(e) => setReviewContent(e.target.value)}
+                  placeholder="What did you think? Was it accurate, well-organised, worth the price?"
+                  rows={3}
+                  className="mt-2 bg-surface"
+                />
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={!reviewContent.trim() || reviewMutation.isPending}
+                  >
+                    {reviewMutation.isPending && <FaSpinner className="h-3.5 w-3.5 animate-spin" />}
+                    {editingReview ? 'Save review' : 'Submit review'}
+                  </Button>
+                </div>
+              </form>
+            ) : needsPurchase ? (
+              <p className="mb-6 rounded-md bg-surface-2 p-3 text-sm text-muted-foreground">
+                Purchase this resource to leave a review.{' '}
+                <Button size="sm" variant="link" asChild className="px-0">
+                  <Link to={`/checkout/${repo.id}`}>Buy now</Link>
+                </Button>
+              </p>
+            ) : !user ? (
+              <p className="mb-6 rounded-md bg-surface-2 p-3 text-sm text-muted-foreground">
+                <Link to="/auth" state={{ from: window.location.pathname }} className="text-accent hover:underline">
+                  Sign in
+                </Link>{' '}
+                to rate this resource.
+              </p>
+            ) : null}
+
+            {reviews.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                No reviews yet — share your experience!
+              </p>
+            ) : (
+              <ul className="space-y-4">
+                {reviews.map((review) => {
+                  const isMine = user?.id === review.userId;
+                  return (
+                    <li key={review.id} className="flex gap-3">
+                      <UserAvatar
+                        nickname={review.user.nickname}
+                        username={review.user.username}
+                        avatarUrl={review.user.avatarUrl}
+                        size="sm"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link to={`/users/${review.user.username}`} className="text-sm font-medium hover:text-accent">
+                            {review.user.nickname}
+                          </Link>
+                          <span className="flex items-center gap-0.5" aria-label={`${review.rating} out of 5 stars`}>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <FaStar
+                                key={n}
+                                className={cn(
+                                  'h-3 w-3',
+                                  n <= review.rating ? 'text-warning' : 'text-muted-foreground/30',
+                                )}
+                                aria-hidden
+                              />
+                            ))}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{timeAgo(review.createdAt)}</span>
+                          {isMine && (
+                            <span className="ml-auto flex gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingReview(review);
+                                  setReviewRating(review.rating);
+                                  setReviewTitle(review.title);
+                                  setReviewContent(review.content);
+                                }}
+                                className="cursor-pointer text-xs text-muted-foreground hover:text-accent"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => deleteReviewMutation.mutate(review.id)}
+                                className="cursor-pointer text-xs text-muted-foreground hover:text-error"
+                              >
+                                Delete
+                              </button>
+                            </span>
+                          )}
+                        </div>
+                        {review.title && <p className="mt-1 text-sm font-semibold">{review.title}</p>}
+                        {review.content && (
+                          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{review.content}</p>
+                        )}
+                        <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <FaCheck className="h-3 w-3 text-success" aria-hidden />
+                          Verified purchase
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
 
         {/* Sidebar */}
         <aside className="space-y-6 lg:col-span-4">
+          {/* Purchase / pricing */}
+          <div
+            className="animate-fade-in-up rounded-lg border border-border bg-surface p-5"
+            style={{ animationDelay: '200ms' }}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                {repo.pricingType === 'free' ? (
+                  <>
+                    <FaDownload className="h-4 w-4 text-success" aria-hidden /> Free download
+                  </>
+                ) : (
+                  <>
+                    <FaLock className="h-4 w-4 text-accent" aria-hidden /> Paid resource
+                  </>
+                )}
+              </h3>
+              {repo.pricingType === 'paid' && (
+                <Badge variant="outline">{formatNumber(repo.totalSales)} sold</Badge>
+              )}
+            </div>
+
+            {repo.pricingType === 'free' ? (
+              <>
+                <p className="mt-2 text-3xl font-extrabold text-success tabular-nums">Free</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No payment needed — download any of the {formatNumber(repo.fileCount)} files directly.
+                </p>
+              </>
+            ) : isOwner ? (
+              <>
+                <p className="mt-2 text-3xl font-extrabold text-accent tabular-nums">
+                  {formatPrice(repo.price, repo.currency)}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">You own this listing.</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 text-center">
+                  <div>
+                    <div className="font-semibold tabular-nums">{formatNumber(repo.totalSales)}</div>
+                    <div className="text-xs text-muted-foreground">Sales</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-success tabular-nums">
+                      {formatPrice(repo.totalRevenue, repo.currency)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Revenue</div>
+                  </div>
+                </div>
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <FaCoins className="h-3.5 w-3.5 text-success" aria-hidden />
+                  You keep {formatPrice(repo.price - platformFee, repo.currency)} per sale after the
+                  {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee.
+                </p>
+              </>
+            ) : isPurchased ? (
+              <>
+                <p className="mt-2 flex items-center gap-2 text-lg font-bold text-success">
+                  <FaCheck className="h-5 w-5" aria-hidden /> Purchased
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  All {formatNumber(repo.fileCount)} files are unlocked. Download them below.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-3xl font-extrabold text-accent tabular-nums">
+                  {formatPrice(repo.price, repo.currency)}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  One-time purchase · instant access · you keep the files forever.
+                </p>
+                <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-xs text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Item price</span>
+                    <span className="tabular-nums">{formatPrice(repo.price, repo.currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Platform fee ({Math.round(PLATFORM_FEE_RATE * 100)}%)</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {formatPrice(platformFee, repo.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-medium text-foreground">
+                    <span>Total due</span>
+                    <span className="text-accent tabular-nums">{formatPrice(repo.price, repo.currency)}</span>
+                  </div>
+                </div>
+                <Button
+                  className="mt-4 w-full"
+                  size="lg"
+                  onClick={() => navigate(`/checkout/${repo.id}`)}
+                >
+                  <FaShoppingCart className="h-4 w-4" /> Buy now
+                </Button>
+                {!user && (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    <Link to="/auth" state={{ from: window.location.pathname }} className="text-accent hover:underline">
+                      Sign in
+                    </Link>{' '}
+                    to purchase.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
           <div className="animate-fade-in-up rounded-lg border border-border bg-surface p-5" style={{ animationDelay: '240ms' }}>
             <h3 className="text-sm font-semibold">Owner</h3>
             <div className="mt-3 flex items-center gap-3">
@@ -559,7 +955,7 @@ export function RepoDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit repository</DialogTitle>
-            <DialogDescription>Update the name, description, category or tags.</DialogDescription>
+            <DialogDescription>Update the name, description, category, pricing or tags.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -603,12 +999,77 @@ export function RepoDetailPage() {
                 placeholder="math, notes, exam — comma separated"
               />
             </div>
+
+            {/* Pricing */}
+            <Separator />
+            <div className="space-y-2">
+              <Label>Pricing</Label>
+              <Select value={editPricingType} onValueChange={(v) => setEditPricingType(v as PricingType)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Free or paid" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free download</SelectItem>
+                  <SelectItem value="paid">Paid resource</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Free resources are downloadable by everyone. Paid resources are unlocked after purchase.
+              </p>
+            </div>
+            {editPricingType === 'paid' && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-repo-price">Price *</Label>
+                  <Input
+                    id="edit-repo-price"
+                    type="number"
+                    min="0.01"
+                    max={MAX_FILE_PRICE}
+                    step="0.01"
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    placeholder="9.9"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={editCurrency} onValueChange={(v) => setEditCurrency(v as Currency)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.symbol} {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="edit-repo-preview">Preview image URL</Label>
+              <Input
+                id="edit-repo-preview"
+                value={editPreviewImageUrl}
+                onChange={(e) => setEditPreviewImageUrl(e.target.value)}
+                placeholder="https://… or /uploads/….png (optional)"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button
               onClick={() => updateMutation.mutate()}
-              disabled={!editName.trim() || !editCategory || updateMutation.isPending}
+              disabled={
+                !editName.trim() ||
+                !editCategory ||
+                (editPricingType === 'paid' &&
+                  (!Number.isFinite(Number(editPrice)) || Number(editPrice) <= 0 || Number(editPrice) > MAX_FILE_PRICE)) ||
+                updateMutation.isPending
+              }
             >
               {updateMutation.isPending && <FaSpinner className="h-4 w-4 animate-spin" />}
               Save changes

@@ -32,7 +32,8 @@ export function FeedPage() {
   const q = searchParams.get('q') ?? '';
   const category = searchParams.get('category') ?? '';
   const sort = searchParams.get('sort') ?? 'recent';
-  const paramsKey = JSON.stringify({ q, category, sort });
+  const pricingType = searchParams.get('pricingType') ?? '';
+  const paramsKey = JSON.stringify({ q, category, sort, pricingType });
 
   const [searchInput, setSearchInput] = useState(q);
   const [offset, setOffset] = useState(0);
@@ -47,7 +48,7 @@ export function FeedPage() {
     queryKey: ['repos', paramsKey, offset],
     queryFn: () =>
       api<RepoListResult>(
-        `/repos?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}&limit=${PAGE_SIZE}&offset=${offset}`,
+        `/repos?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}&pricingType=${encodeURIComponent(pricingType)}&limit=${PAGE_SIZE}&offset=${offset}`,
       ),
   });
 
@@ -86,7 +87,10 @@ export function FeedPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <PageMeta title="Feed" description="Browse and search shared study repositories on SCIEHub." />
+      <PageMeta
+        title="Marketplace"
+        description="Browse, buy and download free and premium study resources on SCIEHub."
+      />
 
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Left sidebar */}
@@ -144,9 +148,9 @@ export function FeedPage() {
               <Input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search repositories…"
+                placeholder="Search resources to buy or download…"
                 className="pl-9"
-                aria-label="Search repositories"
+                aria-label="Search resources"
               />
             </form>
             <Select value={category} onValueChange={(v) => setParam('category', v === 'all' ? '' : v)}>
@@ -160,14 +164,28 @@ export function FeedPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={sort} onValueChange={(v) => setParam('sort', v)}>
+            <Select value={pricingType} onValueChange={(v) => setParam('pricingType', v === 'all' ? '' : v)}>
               <SelectTrigger className="w-36">
+                <SelectValue placeholder="All pricing" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All pricing</SelectItem>
+                <SelectItem value="free">Free only</SelectItem>
+                <SelectItem value="paid">Paid only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sort} onValueChange={(v) => setParam('sort', v)}>
+              <SelectTrigger className="w-40">
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="recent">Most recent</SelectItem>
                 <SelectItem value="popular">Most downloaded</SelectItem>
                 <SelectItem value="views">Most viewed</SelectItem>
+                <SelectItem value="sales">Most sold</SelectItem>
+                <SelectItem value="rating">Top rated</SelectItem>
+                <SelectItem value="price_asc">Price: low → high</SelectItem>
+                <SelectItem value="price_desc">Price: high → low</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -193,8 +211,10 @@ export function FeedPage() {
             ) : items.length === 0 ? (
               <div className="rounded-lg border border-border bg-surface py-16 text-center">
                 <FaBook className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-3 font-medium">No repositories found</p>
-                <p className="mt-1 text-sm text-muted-foreground">Try a different search term or be the first to share one.</p>
+                <p className="mt-3 font-medium">No resources found</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Try a different search term, adjust the filters, or be the first to share one.
+                </p>
               </div>
             ) : (
               items.map((repo, i) => (

@@ -13,6 +13,9 @@ import { AdminPage } from './pages/AdminPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { ConductPage } from './pages/ConductPage';
 import { ContributingPage } from './pages/ContributingPage';
+import { OrdersPage } from './pages/OrdersPage';
+import { WalletPage } from './pages/WalletPage';
+import { CheckoutPage } from './pages/CheckoutPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -21,8 +24,12 @@ export function AppRoutes() {
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="/feed" element={<FeedPage />} />
+        <Route path="/marketplace" element={<FeedPage />} />
         <Route path="/repos/:id" element={<RepoDetailPage />} />
+        <Route path="/checkout/:repoId" element={<CheckoutPage />} />
         <Route path="/upload" element={<UploadPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/wallet" element={<WalletPage />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/groups/:id" element={<GroupDetailPage />} />
         <Route path="/users/:username" element={<UserProfilePage />} />

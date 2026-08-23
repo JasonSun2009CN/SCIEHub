@@ -1,12 +1,16 @@
 // Domain types shared between the frontend and backend.
 
-export type FileType = 'pdf' | 'doc' | 'ppt' | 'image' | 'code' | 'other';
+export type FileType = 'pdf' | 'doc' | 'ppt' | 'image' | 'code' | 'audio' | 'video' | 'archive' | 'other';
+export type PricingType = 'free' | 'paid';
+export type Currency = 'CNY' | 'USD';
+export type OrderStatus = 'pending' | 'paid' | 'refunded' | 'cancelled';
+export type ReviewRating = 1 | 2 | 3 | 4 | 5;
+export type TransactionType = 'purchase' | 'sale' | 'refund' | 'topup' | 'withdraw';
 
 export interface User {
   id: string;
   username: string;
   nickname: string;
-  /** An image URL, or a color hex like '#38bdf8' meaning "render initials on this color". */
   avatarUrl: string;
   bio: string;
   createdAt: string;
@@ -15,13 +19,14 @@ export interface User {
   groupCount: number;
   totalDownloads: number;
   totalBytes: number;
+  walletBalance: number;
+  totalSales: number;
+  totalPurchases: number;
   isAdmin?: boolean;
   isSuspended?: boolean;
-  /** Only populated by admin endpoints — never exposed on public user objects. */
   email?: string;
 }
 
-/** A user-owned repository of study files (GitHub-style). */
 export interface Repository {
   id: string;
   name: string;
@@ -37,14 +42,22 @@ export interface Repository {
   viewCount: number;
   commentCount: number;
   favoriteCount: number;
+  reviewCount: number;
+  averageRating: number;
   groupIds: string[];
   groupNames: string[];
   createdAt: string;
+  pricingType: PricingType;
+  price: number;
+  currency: Currency;
+  totalSales: number;
+  totalRevenue: number;
   isFavorite?: boolean;
   isOwner?: boolean;
+  isPurchased?: boolean;
+  previewImageUrl?: string;
 }
 
-/** A single file inside a repository. */
 export interface RepoFile {
   id: string;
   repoId: string;
@@ -57,6 +70,7 @@ export interface RepoFile {
   downloadCount: number;
   viewCount: number;
   createdAt: string;
+  isPreview: boolean;
 }
 
 export interface Group {
@@ -72,7 +86,6 @@ export interface Group {
   createdAt: string;
   isMember?: boolean;
   isAdmin?: boolean;
-  /** Current user's membership-request status, when they asked to join. */
   joinStatus?: 'pending' | 'rejected' | null;
 }
 
@@ -101,7 +114,6 @@ export interface Comment {
   createdAt: string;
 }
 
-/** One recorded sign-in attempt, shown on the user's "login history" screen. */
 export interface LoginLog {
   id: string;
   userId: string | null;
@@ -118,9 +130,12 @@ export interface LeaderboardEntry {
   fileCount: number;
   totalBytes: number;
   totalDownloads: number;
+  totalSales: number;
+  totalRevenue: number;
+  averageRating?: number;
 }
 
-export type ReportTarget = 'repo' | 'comment';
+export type ReportTarget = 'repo' | 'comment' | 'review';
 
 export interface Report {
   id: string;
@@ -132,7 +147,6 @@ export interface Report {
   status: 'open' | 'resolved';
 }
 
-/** A report enriched for the admin console (reporter + resolved target info). */
 export interface AdminReportItem extends Report {
   reporter: User;
   targetName: string;
@@ -141,10 +155,12 @@ export interface AdminReportItem extends Report {
 
 export const REPORT_REASONS = [
   { id: 'harassment', label: 'Harassment or abuse' },
-  { id: 'copyright', label: 'Copyright violation' },
-  { id: 'plagiarism', label: 'Plagiarism' },
+  { id: 'copyright', label: 'Copyright violation / DMCA' },
+  { id: 'plagiarism', label: 'Plagiarism or stolen content' },
   { id: 'spam', label: 'Spam or misleading' },
   { id: 'inappropriate', label: 'Inappropriate content' },
+  { id: 'pricing', label: 'Pricing scam or overcharge' },
+  { id: 'quality', label: 'False advertising / poor quality' },
   { id: 'other', label: 'Other' },
 ] as const;
 
@@ -158,12 +174,16 @@ export const CATEGORIES: Category[] = [
   { id: 'physics', name: 'Physics' },
   { id: 'chemistry', name: 'Chemistry' },
   { id: 'biology', name: 'Biology' },
-  { id: 'economics', name: 'Economics' },
+  { id: 'economics', name: 'Economics & Business' },
   { id: 'cs', name: 'Computer Science' },
-  { id: 'language', name: 'Languages' },
-  { id: 'history', name: 'History' },
-  { id: 'art', name: 'Arts & Humanities' },
-  { id: 'exam', name: 'Exam Prep' },
+  { id: 'language', name: 'Languages & Literature' },
+  { id: 'history', name: 'History & Geography' },
+  { id: 'art', name: 'Arts & Design' },
+  { id: 'exam', name: 'Exam Prep & Past Papers' },
+  { id: 'template', name: 'Templates & Tools' },
+  { id: 'music', name: 'Music & Audio' },
+  { id: 'video', name: 'Video Courses' },
+  { id: 'software', name: 'Software & Scripts' },
   { id: 'other', name: 'Other' },
 ];
 
@@ -172,7 +192,7 @@ export function categoryName(id: string): string {
 }
 
 export type GroupSort = 'members' | 'repos' | 'recent';
-export type RepoSort = 'recent' | 'popular' | 'views';
+export type RepoSort = 'recent' | 'popular' | 'views' | 'price_asc' | 'price_desc' | 'rating' | 'sales';
 
 export interface RepoListResult {
   items: Repository[];
@@ -185,6 +205,9 @@ export interface HomeStats {
   groups: number;
   users: number;
   downloads: number;
+  totalSales: number;
+  totalRevenue: number;
+  freeRepos: number;
 }
 
 export interface HomeData {
@@ -192,7 +215,9 @@ export interface HomeData {
   hotRepos: Repository[];
   activeGroups: Group[];
   recentRepos: Repository[];
+  topSellers: LeaderboardEntry[];
   topContributors: LeaderboardEntry[];
+  freeRepos: Repository[];
 }
 
 export interface SearchResult {
@@ -209,6 +234,99 @@ export interface Paged<T> {
   items: T[];
   total: number;
 }
+
+// ---------------------------------------------------------------------------
+// Commerce / Marketplace types
+// ---------------------------------------------------------------------------
+
+export interface Order {
+  id: string;
+  orderNo: string;
+  buyerId: string;
+  buyer: User;
+  sellerId: string;
+  seller: User;
+  repoId: string;
+  repoName: string;
+  repoOwnerId: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  currency: Currency;
+  platformFee: number;
+  sellerEarning: number;
+  status: OrderStatus;
+  createdAt: string;
+  paidAt?: string;
+  refundedAt?: string;
+  cancelledAt?: string;
+}
+
+export interface PurchaseRecord {
+  id: string;
+  orderId: string;
+  userId: string;
+  repoId: string;
+  repo: Repository;
+  price: number;
+  currency: Currency;
+  purchasedAt: string;
+}
+
+export interface Review {
+  id: string;
+  repoId: string;
+  userId: string;
+  user: User;
+  rating: ReviewRating;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  helpfulCount: number;
+}
+
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  user: User;
+  type: TransactionType;
+  amount: number;
+  balanceAfter: number;
+  currency: Currency;
+  description: string;
+  orderId?: string;
+  referenceId?: string;
+  createdAt: string;
+}
+
+export interface WalletOverview {
+  balance: number;
+  currency: Currency;
+  totalIncome: number;
+  totalExpense: number;
+  pendingEarnings: number;
+  recentTransactions: WalletTransaction[];
+}
+
+export const CURRENCIES: { code: Currency; symbol: string; name: string }[] = [
+  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+];
+
+export function currencySymbol(code: Currency): string {
+  return CURRENCIES.find((c) => c.code === code)?.symbol ?? code;
+}
+
+export function formatPrice(amount: number, currency: Currency): string {
+  if (amount === 0) return 'Free';
+  const symbol = currencySymbol(currency);
+  return `${symbol}${amount.toFixed(2)}`;
+}
+
+export const PLATFORM_FEE_RATE = 0.10; // 10% platform fee
+export const MIN_WITHDRAW_AMOUNT = 10;
+export const MAX_FILE_PRICE = 9999;
 
 export const AVATAR_COLORS = [
   '#38bdf8',
@@ -232,10 +350,16 @@ export function initials(name: string): string {
     .join('');
 }
 
-/** 43 bytes -> "43 B"; 1_500_000 -> "1.4 MB" */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+}
+
+export function generateOrderNo(): string {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `SC${date}${rand}`;
 }

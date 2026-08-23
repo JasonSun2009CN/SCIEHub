@@ -1,18 +1,24 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FaBook, FaCalendarAlt, FaDownload, FaUsers } from 'react-icons/fa';
-import { formatBytes, type Group, type Repository, type User } from '@sciehub/shared';
+import { FaBook, FaCalendarAlt, FaCoins, FaDownload, FaShoppingBag, FaUsers } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
+import { formatBytes, formatPrice, type Group, type PurchaseRecord, type Repository, type User } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserAvatar } from '@/components/generated/UserAvatar';
 import { RepositoryCard } from '@/components/generated/RepositoryCard';
 import { GroupCard } from '@/components/generated/GroupCard';
+import { useAuth } from '@/context/AuthContext';
 import { formatDate, formatNumber } from '@/lib/utils';
 
 export function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
+  const { user: currentUser } = useAuth();
+  const isMe = Boolean(currentUser && currentUser.username === username);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['user', username],
@@ -36,6 +42,12 @@ export function UserProfilePage() {
     queryKey: ['userGroups', username],
     queryFn: () => api<{ items: Group[] }>(`/users/${username}/groups`),
     enabled: Boolean(username),
+  });
+
+  const { data: purchases } = useQuery({
+    queryKey: ['myPurchases'],
+    queryFn: () => api<{ items: PurchaseRecord[] }>(`/users/me/purchases`),
+    enabled: isMe,
   });
 
   const user = data?.user;
@@ -69,6 +81,7 @@ export function UserProfilePage() {
     { Icon: FaBook, label: 'Files shared', value: user.fileCount },
     { Icon: FaUsers, label: 'Groups', value: user.groupCount },
     { Icon: FaDownload, label: 'Total downloads', value: formatNumber(user.totalDownloads) },
+    { Icon: FaCoins, label: 'Sales', value: formatNumber(user.totalSales) },
   ];
 
   return (
@@ -112,6 +125,11 @@ export function UserProfilePage() {
             <FaBook className="h-3.5 w-3.5" /> Repositories
           </TabsTrigger>
           <TabsTrigger value="favorites">Favorites</TabsTrigger>
+          {isMe && (
+            <TabsTrigger value="purchases">
+              <FaShoppingBag className="h-3.5 w-3.5" /> Purchases
+            </TabsTrigger>
+          )}
           <TabsTrigger value="groups">
             <FaUsers className="h-3.5 w-3.5" /> Groups
           </TabsTrigger>
@@ -152,6 +170,39 @@ export function UserProfilePage() {
             <Empty text="Not a member of any groups yet." />
           )}
         </TabsContent>
+
+        {isMe && (
+          <TabsContent value="purchases">
+            {purchases?.items?.length ? (
+              <ul className="space-y-3">
+                {purchases.items.map((p) => (
+                  <li
+                    key={p.id}
+                    className="animate-fade-in-up flex flex-wrap items-center gap-4 rounded-lg border border-border bg-surface p-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <Link to={`/repos/${p.repo.id}`} className="truncate font-semibold hover:text-accent">
+                        {p.repo.name}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Purchased {formatDate(p.purchasedAt)}
+                      </p>
+                    </div>
+                    <Badge variant="success">Owned</Badge>
+                    <div className="shrink-0 font-semibold tabular-nums text-accent">
+                      {formatPrice(p.price, p.currency)}
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/repos/${p.repo.id}`}>Download</Link>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty text="You haven't purchased any resources yet." />
+            )}
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -1,10 +1,13 @@
 import type { IconType } from 'react-icons';
 import {
   FaFileAlt,
+  FaFileArchive,
+  FaFileAudio,
   FaFileCode,
   FaFileImage,
   FaFilePdf,
   FaFilePowerpoint,
+  FaFileVideo,
   FaFileWord,
 } from 'react-icons/fa';
 import type { FileType } from '@sciehub/shared';
@@ -16,6 +19,9 @@ const ICONS: Record<FileType, IconType> = {
   ppt: FaFilePowerpoint,
   image: FaFileImage,
   code: FaFileCode,
+  audio: FaFileAudio,
+  video: FaFileVideo,
+  archive: FaFileArchive,
   other: FaFileAlt,
 };
 
@@ -25,6 +31,9 @@ const COLORS: Record<FileType, string> = {
   ppt: 'text-warning',
   image: 'text-success',
   code: 'text-accent',
+  audio: 'text-success',
+  video: 'text-warning',
+  archive: 'text-accent',
   other: 'text-muted-foreground',
 };
 

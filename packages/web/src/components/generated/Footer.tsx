@@ -4,12 +4,13 @@ import { FaGithub, FaGraduationCap } from 'react-icons/fa';
 const GITHUB_REPO = 'https://github.com/JasonSun2009CN/SCIEHub';
 
 const PLATFORM_LINKS = [
-  { to: '/feed', label: 'Resources' },
+  { to: '/marketplace', label: 'Marketplace' },
+  { to: '/orders', label: 'My orders' },
+  { to: '/wallet', label: 'Wallet' },
   { to: '/groups', label: 'Groups' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/conduct', label: 'Community guidelines' },
-  { to: '/contributing', label: 'Contribute' },
-  { to: '/upload', label: 'Upload' },
+  { to: '/upload', label: 'Upload & sell' },
 ];
 
 export function Footer() {
@@ -25,7 +26,8 @@ export function Footer() {
               SCIE<span className="text-accent">Hub</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Share, Collaborate, Excel. A study-materials sharing platform for international high schoolers.
+              Share, Buy, Sell, Excel. A study-materials sharing & selling marketplace for international
+              high schoolers.
             </p>
           </div>
 

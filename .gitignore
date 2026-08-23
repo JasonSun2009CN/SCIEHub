@@ -8,3 +8,6 @@ dist/
 *.db-shm
 *.db-wal
 packages/server/data/
+.idea/
+.vscode/
+*.tsbuildinfo

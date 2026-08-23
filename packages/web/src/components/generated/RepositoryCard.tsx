@@ -1,6 +1,16 @@
 import { Link } from 'react-router-dom';
-import { FaBook, FaComment, FaDownload, FaEye, FaFolder, FaHeart } from 'react-icons/fa';
-import { formatBytes, type Repository } from '@sciehub/shared';
+import {
+  FaBook,
+  FaCheck,
+  FaComment,
+  FaDownload,
+  FaEye,
+  FaFolder,
+  FaHeart,
+  FaStar,
+  FaTag,
+} from 'react-icons/fa';
+import { formatBytes, formatPrice, type Repository } from '@sciehub/shared';
 import { Badge } from '@/components/ui/badge';
 import { UserAvatar } from './UserAvatar';
 import { cn, formatNumber, timeAgo } from '@/lib/utils';
@@ -11,23 +21,86 @@ interface RepositoryCardProps {
   showGroups?: boolean;
 }
 
+function PriceBadge({ repo }: { repo: Repository }) {
+  if (repo.pricingType === 'free') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">
+        <FaTag className="h-2.5 w-2.5" />
+        FREE
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">
+      <FaTag className="h-2.5 w-2.5" />
+      {formatPrice(repo.price, repo.currency)}
+    </span>
+  );
+}
+
+function RatingRow({ repo }: { repo: Repository }) {
+  if ((repo.reviewCount ?? 0) === 0) return null;
+  const rating = Number(repo.averageRating ?? 0);
+  return (
+    <span className="flex items-center gap-1 text-xs text-warning">
+      <FaStar className="h-3 w-3 fill-warning/90" />
+      <span className="font-semibold tabular-nums">{rating.toFixed(1)}</span>
+      <span className="text-muted-foreground">({repo.reviewCount})</span>
+    </span>
+  );
+}
+
 export function RepositoryCard({ repo, index = 0, showGroups = true }: RepositoryCardProps) {
   return (
     <div
       className={cn(
-        'card-hover group animate-fade-in-up flex flex-col rounded-lg border border-border bg-surface p-5 hover:border-accent',
+        'card-hover group relative animate-fade-in-up flex flex-col rounded-lg border border-border bg-surface p-5 hover:border-accent',
       )}
       style={{ animationDelay: `${index * 60}ms` }}
     >
+      {/* Purchased check mark */}
+      {repo.isPurchased && (
+        <span
+          className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success shadow-sm"
+          title="You already own this resource"
+        >
+          <FaCheck className="h-2.5 w-2.5" />
+          Purchased
+        </span>
+      )}
+
+      {/* Preview image banner */}
+      {repo.previewImageUrl && (
+        <Link
+          to={`/repos/${repo.id}`}
+          className="mb-4 -mx-2 -mt-2 block aspect-[16/7] overflow-hidden rounded-md bg-surface-2"
+          aria-hidden
+        >
+          <img
+            src={repo.previewImageUrl}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        </Link>
+      )}
+
       <div className="flex items-start gap-3">
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent-subtle text-accent">
           <FaFolder className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <Link to={`/repos/${repo.id}`}>
-            <h3 className="line-clamp-1 font-semibold transition-colors group-hover:text-accent">{repo.name}</h3>
-          </Link>
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{repo.description || 'No description provided.'}</p>
+          <div className="flex items-center justify-between gap-2">
+            <Link to={`/repos/${repo.id}`} className="min-w-0 flex-1">
+              <h3 className="line-clamp-1 font-semibold transition-colors group-hover:text-accent">
+                {repo.name}
+              </h3>
+            </Link>
+            <PriceBadge repo={repo} />
+          </div>
+          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+            {repo.description || 'No description provided.'}
+          </p>
         </div>
       </div>
 
@@ -41,10 +114,16 @@ export function RepositoryCard({ repo, index = 0, showGroups = true }: Repositor
               {g}
             </span>
           ))}
-        <span className="ml-auto">{timeAgo(repo.createdAt)}</span>
+        <RatingRow repo={repo} />
+        {(repo.totalSales ?? 0) > 0 && (
+          <span className="ml-auto text-[11px] font-semibold text-accent/90">
+            {repo.totalSales} sold
+          </span>
+        )}
+        {!repo.totalSales && <span className="ml-auto">{timeAgo(repo.createdAt)}</span>}
       </div>
 
-      <div className="mt-3 flex items-center gap-4 border-t border-border pt-3 text-xs text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
         <span title="Files" className="flex items-center gap-1">
           <FaBook className="h-3 w-3" /> {repo.fileCount}
         </span>

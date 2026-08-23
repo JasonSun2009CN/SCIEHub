@@ -1,10 +1,11 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FaBook, FaDownload, FaTrophy } from 'react-icons/fa';
-import { formatBytes, type LeaderboardEntry } from '@sciehub/shared';
+import { FaBook, FaCoins, FaDownload, FaTrophy } from 'react-icons/fa';
+import { formatBytes, formatPrice, type LeaderboardEntry } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserAvatar } from '@/components/generated/UserAvatar';
 import { cn, formatNumber } from '@/lib/utils';
 
@@ -27,9 +28,13 @@ function SkeletonRows() {
 }
 
 export function LeaderboardPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const type = searchParams.get('type') === 'sales' ? 'sales' : 'contributors';
+  const isSales = type === 'sales';
+
   const { data, isLoading } = useQuery({
-    queryKey: ['leaderboard'],
-    queryFn: () => api<{ items: LeaderboardEntry[] }>('/leaderboard'),
+    queryKey: ['leaderboard', type],
+    queryFn: () => api<{ items: LeaderboardEntry[]; type: string }>(`/leaderboard?type=${type}`),
   });
 
   const entries = data?.items ?? [];
@@ -37,13 +42,35 @@ export function LeaderboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-      <PageMeta title="Leaderboard" description="SCIEHub's top contributors — ranked by files shared and total size." />
+      <PageMeta
+        title={isSales ? 'Top sellers' : 'Leaderboard'}
+        description={
+          isSales
+            ? 'SCIEHub marketplace top sellers — ranked by sales and revenue.'
+            : "SCIEHub's top contributors — ranked by files shared and total size."
+        }
+      />
       <div className="text-center">
         <FaTrophy className="mx-auto h-10 w-10 text-warning" />
-        <h1 className="mt-3 text-2xl font-bold">Community leaderboard</h1>
+        <h1 className="mt-3 text-2xl font-bold">{isSales ? 'Top sellers' : 'Community leaderboard'}</h1>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          Celebrating the students who share the most — ranked by files shared, with total size shown alongside.
+          {isSales
+            ? 'The students earning the most from their shared work — ranked by number of sales, with total revenue alongside.'
+            : 'Celebrating the students who share the most — ranked by files shared, with total size shown alongside.'}
         </p>
+      </div>
+
+      <div className="mt-6 flex justify-center">
+        <Tabs value={type} onValueChange={(v) => setSearchParams(v === 'sales' ? { type: 'sales' } : {}, { replace: true })}>
+          <TabsList>
+            <TabsTrigger value="contributors" className="gap-1.5">
+              <FaBook className="h-3.5 w-3.5" /> Top contributors
+            </TabsTrigger>
+            <TabsTrigger value="sales" className="gap-1.5">
+              <FaCoins className="h-3.5 w-3.5" /> Top sellers
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {isLoading ? (
@@ -52,10 +79,21 @@ export function LeaderboardPage() {
         </div>
       ) : entries.length === 0 ? (
         <div className="mt-8 rounded-lg border border-border bg-surface py-16 text-center text-sm text-muted-foreground">
-          No contributions yet. Share your first repository to claim the top spot!
-          <div className="mt-3">
-            <Link to="/upload" className="text-accent hover:underline">Create a repository →</Link>
-          </div>
+          {isSales ? (
+            <>
+              No sales yet. Price a resource and start earning!
+              <div className="mt-3">
+                <Link to="/upload" className="text-accent hover:underline">Upload & sell →</Link>
+              </div>
+            </>
+          ) : (
+            <>
+              No contributions yet. Share your first repository to claim the top spot!
+              <div className="mt-3">
+                <Link to="/upload" className="text-accent hover:underline">Create a repository →</Link>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -77,10 +115,25 @@ export function LeaderboardPage() {
                 <Link to={`/users/${entry.user.username}`} className="mt-2 block truncate font-semibold hover:text-accent">
                   {entry.user.nickname}
                 </Link>
-                <div className="mt-1 text-2xl font-bold text-accent">{entry.fileCount}</div>
-                <div className="text-xs text-muted-foreground">files shared</div>
-                <div className="mt-2 text-sm font-medium">{formatBytes(entry.totalBytes)}</div>
-                <div className="text-xs text-muted-foreground">total size</div>
+                {isSales ? (
+                  <>
+                    <div className="mt-1 text-2xl font-bold text-accent">
+                      {formatNumber(entry.totalSales)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">sales</div>
+                    <div className="mt-2 text-sm font-medium text-success">
+                      {formatPrice(entry.totalRevenue, 'CNY')}
+                    </div>
+                    <div className="text-xs text-muted-foreground">total revenue</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-1 text-2xl font-bold text-accent">{entry.fileCount}</div>
+                    <div className="text-xs text-muted-foreground">files shared</div>
+                    <div className="mt-2 text-sm font-medium">{formatBytes(entry.totalBytes)}</div>
+                    <div className="text-xs text-muted-foreground">total size</div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -91,11 +144,22 @@ export function LeaderboardPage() {
               <thead>
                 <tr className="border-b border-border bg-surface-2 text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-4 py-3">Rank</th>
-                  <th className="px-4 py-3">Contributor</th>
-                  <th className="px-4 py-3 text-right">Files</th>
-                  <th className="px-4 py-3 text-right">Total size</th>
-                  <th className="hidden px-4 py-3 text-right sm:table-cell">Repositories</th>
-                  <th className="hidden px-4 py-3 text-right md:table-cell">Downloads</th>
+                  <th className="px-4 py-3">{isSales ? 'Seller' : 'Contributor'}</th>
+                  {isSales ? (
+                    <>
+                      <th className="px-4 py-3 text-right">Sales</th>
+                      <th className="px-4 py-3 text-right">Revenue</th>
+                      <th className="hidden px-4 py-3 text-right sm:table-cell">Repositories</th>
+                      <th className="hidden px-4 py-3 text-right md:table-cell">Downloads</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-4 py-3 text-right">Files</th>
+                      <th className="px-4 py-3 text-right">Total size</th>
+                      <th className="hidden px-4 py-3 text-right sm:table-cell">Repositories</th>
+                      <th className="hidden px-4 py-3 text-right md:table-cell">Downloads</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -111,14 +175,29 @@ export function LeaderboardPage() {
                         <span className="hidden text-xs text-muted-foreground sm:inline">@{entry.user.username}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-accent">{entry.fileCount}</td>
-                    <td className="px-4 py-3 text-right">{formatBytes(entry.totalBytes)}</td>
-                    <td className="hidden px-4 py-3 text-right sm:table-cell">{entry.repoCount}</td>
-                    <td className="hidden px-4 py-3 text-right md:table-cell">
-                      <span className="inline-flex items-center gap-1">
-                        <FaDownload className="h-3 w-3" /> {formatNumber(entry.totalDownloads)}
-                      </span>
-                    </td>
+                    {isSales ? (
+                      <>
+                        <td className="px-4 py-3 text-right font-semibold text-accent">{formatNumber(entry.totalSales)}</td>
+                        <td className="px-4 py-3 text-right text-success">{formatPrice(entry.totalRevenue, 'CNY')}</td>
+                        <td className="hidden px-4 py-3 text-right sm:table-cell">{entry.repoCount}</td>
+                        <td className="hidden px-4 py-3 text-right md:table-cell">
+                          <span className="inline-flex items-center gap-1">
+                            <FaDownload className="h-3 w-3" /> {formatNumber(entry.totalDownloads)}
+                          </span>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 text-right font-semibold text-accent">{entry.fileCount}</td>
+                        <td className="px-4 py-3 text-right">{formatBytes(entry.totalBytes)}</td>
+                        <td className="hidden px-4 py-3 text-right sm:table-cell">{entry.repoCount}</td>
+                        <td className="hidden px-4 py-3 text-right md:table-cell">
+                          <span className="inline-flex items-center gap-1">
+                            <FaDownload className="h-3 w-3" /> {formatNumber(entry.totalDownloads)}
+                          </span>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -126,7 +205,15 @@ export function LeaderboardPage() {
           </div>
 
           <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
-            <FaBook className="h-3.5 w-3.5" /> Ranked by number of files shared; total size shown for reference.
+            {isSales ? (
+              <>
+                <FaCoins className="h-3.5 w-3.5" /> Ranked by confirmed sales; revenue excludes the platform fee.
+              </>
+            ) : (
+              <>
+                <FaBook className="h-3.5 w-3.5" /> Ranked by number of files shared; total size shown for reference.
+              </>
+            )}
           </p>
         </>
       )}

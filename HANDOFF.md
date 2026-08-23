@@ -1,15 +1,15 @@
 # SCIEHub — Handoff
 
 ## 当前状态
-**全部模块完成并通过验证**（生产构建 + API 端到端测试 + Headless Chrome 渲染）。采用 **Repository 模型**：用户拥有仓库、可分享进小组；加入小组需创建人审批；社区有榜单与公约。**无演示数据**——首次启动创建空库，注册后即可使用。
-- 前端：12 个页面 + 深/浅主题 + shadcn/ui 组件 + TanStack Query 数据层。
+**全部模块完成并通过验证**（生产构建 + typecheck + API 端到端测试 + Headless Chrome 渲染）。采用 **Repository 模型**，并已转型为**资源共享/售卖市场**：仓库可标价或免费，内置钱包/订单/退款/评价闭环。**无演示数据**——首次启动创建空库，注册后即可使用。
+- 前端：15 个页面（新增 Checkout / Orders / Wallet）+ 深/浅主题 + shadcn/ui 组件 + TanStack Query 数据层。
 - 后端：Fastify REST API、JWT 认证、multipart 上传落盘、生产静态托管 + SPA fallback。
-- 迭代二新增：repos/repo_groups/group_requests/reports 表、/leaderboard、/conduct、举报按钮、加入审批。
-- 迭代三：页脚仅保留 GitHub 仓库地址（移除社媒）；邮箱占用申诉 mailto（jasonsun2009@yeah.net）；`npm start` 自动构建、`npm run deploy` 部署即用。
-- 迭代四：管理员端（/admin 概览/报告/用户/仓库，封禁/注销/删除违规内容）、`ADMIN_EMAILS` 自动晋升 + `promote-admin` 脚本、忘记密码联系管理员 mailto。
-- 迭代五：**首个注册用户自动成为管理员**（代码无任何密码/哈希）；登录记录 + 登录历史查看 + 全部登出（token_version）；注销两种（停用 30 天/登录恢复/超期删除 + 密码确认永久删除）；管理员新增 + 让位 + 最后管理员守卫。
+- 市场化（Phase 11）：Repository 定价（free/paid + ¥/$ + 销量/收入）；orders/purchases/reviews/wallet_transactions 表；钱包余额；checkout→pay 交易流；卖方/管理员退款；评价系统；`/marketplace` 定价筛选与销量/评分/价格排序；Home 市场 Hero + 热销 + 免费资源；个人主页"已购"页签；销量榜；管理端 Orders Tab + 钱包充值。
+- 社区（迭代二~五）：小组加入审批、/leaderboard、/conduct、举报、管理员端、登录记录、全部登出、停用/永久删除、首个用户自动成为管理员、管理员新增/让位。
 - 管理员开通（三种）：① 全新安装时第一个注册的账号即管理员；② `ADMIN_EMAILS=邮箱 npm start`，该邮箱注册/登录自动晋升；③ `npm run promote-admin -w @sciehub/server -- <email>`。
+- 钱包充值：管理员在 `/admin` → Users 对任意用户充值（真实支付/提现不在 MVP 范围）。
 - `npm run dev` 本地开发；`npm start`（自动构建）或 `npm run deploy` 部署即用。
+- 用户手册：`docs/USER_MANUAL.md`。
 
 ## 已确认决策
 | 项 | 决策 |

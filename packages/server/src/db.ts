@@ -6,18 +6,28 @@ import {
   categoryName,
   type AdminReportItem,
   type Comment,
+  type Currency,
   type FileType,
+  generateOrderNo,
   type Group,
   type GroupMember,
   type GroupRequest,
   type HomeData,
   type LeaderboardEntry,
   type LoginLog,
+  type Order,
+  type OrderStatus,
+  type PurchaseRecord,
   type RepoFile,
   type Report,
   type ReportTarget,
   type Repository,
+  type Review,
+  type ReviewRating,
+  type TransactionType,
   type User,
+  type WalletOverview,
+  type WalletTransaction,
 } from '@sciehub/shared';
 import { config } from './config.js';
 
@@ -34,18 +44,21 @@ db.pragma('foreign_keys = ON');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
-  id            TEXT PRIMARY KEY,
-  username      TEXT UNIQUE NOT NULL,
-  email         TEXT UNIQUE NOT NULL,
-  nickname      TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  avatar_url    TEXT NOT NULL DEFAULT '',
-  bio           TEXT NOT NULL DEFAULT '',
-  created_at    TEXT NOT NULL,
-  is_admin      INTEGER NOT NULL DEFAULT 0,
-  is_suspended  INTEGER NOT NULL DEFAULT 0,
-  token_version INTEGER NOT NULL DEFAULT 0,
-  deactivated_at TEXT
+  id              TEXT PRIMARY KEY,
+  username        TEXT UNIQUE NOT NULL,
+  email           TEXT UNIQUE NOT NULL,
+  nickname        TEXT NOT NULL,
+  password_hash   TEXT NOT NULL,
+  avatar_url      TEXT NOT NULL DEFAULT '',
+  bio             TEXT NOT NULL DEFAULT '',
+  created_at      TEXT NOT NULL,
+  is_admin        INTEGER NOT NULL DEFAULT 0,
+  is_suspended    INTEGER NOT NULL DEFAULT 0,
+  token_version   INTEGER NOT NULL DEFAULT 0,
+  deactivated_at  TEXT,
+  wallet_balance  REAL NOT NULL DEFAULT 0,
+  total_sales     INTEGER NOT NULL DEFAULT 0,
+  total_purchases INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -76,18 +89,26 @@ CREATE TABLE IF NOT EXISTS group_requests (
 CREATE INDEX IF NOT EXISTS idx_group_requests_group ON group_requests(group_id, status);
 
 CREATE TABLE IF NOT EXISTS repos (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  owner_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  category_id TEXT NOT NULL,
-  tags        TEXT NOT NULL DEFAULT '[]',
-  view_count  INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  owner_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category_id   TEXT NOT NULL,
+  tags          TEXT NOT NULL DEFAULT '[]',
+  view_count    INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL,
+  pricing_type  TEXT NOT NULL DEFAULT 'free',
+  price         REAL NOT NULL DEFAULT 0,
+  currency      TEXT NOT NULL DEFAULT 'CNY',
+  total_sales   INTEGER NOT NULL DEFAULT 0,
+  total_revenue REAL NOT NULL DEFAULT 0,
+  preview_image TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_repos_created ON repos(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_repos_owner ON repos(owner_id);
 CREATE INDEX IF NOT EXISTS idx_repos_category ON repos(category_id);
+/* idx_repos_pricing / idx_repos_price are created below, after ensureColumns(),
+   so databases created before the pricing migration don't fail on a missing column. */
 
 CREATE TABLE IF NOT EXISTS repo_groups (
   repo_id  TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
@@ -107,7 +128,8 @@ CREATE TABLE IF NOT EXISTS files (
   file_path      TEXT NOT NULL,
   download_count INTEGER NOT NULL DEFAULT 0,
   view_count     INTEGER NOT NULL DEFAULT 0,
-  created_at     TEXT NOT NULL
+  created_at     TEXT NOT NULL,
+  is_preview     INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_files_repo ON files(repo_id);
 
@@ -148,17 +170,112 @@ CREATE TABLE IF NOT EXISTS login_logs (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_login_logs_user ON login_logs(user_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Marketplace tables
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS orders (
+  id              TEXT PRIMARY KEY,
+  order_no        TEXT UNIQUE NOT NULL,
+  buyer_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  seller_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  repo_id         TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+  repo_name       TEXT NOT NULL,
+  repo_owner_id   TEXT NOT NULL,
+  quantity        INTEGER NOT NULL DEFAULT 1,
+  unit_price      REAL NOT NULL DEFAULT 0,
+  total_amount    REAL NOT NULL DEFAULT 0,
+  currency        TEXT NOT NULL DEFAULT 'CNY',
+  platform_fee    REAL NOT NULL DEFAULT 0,
+  seller_earning  REAL NOT NULL DEFAULT 0,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  created_at      TEXT NOT NULL,
+  paid_at         TEXT,
+  refunded_at     TEXT,
+  cancelled_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_seller ON orders(seller_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_repo ON orders(repo_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_no ON orders(order_no);
+
+CREATE TABLE IF NOT EXISTS purchases (
+  id           TEXT PRIMARY KEY,
+  order_id     TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  repo_id      TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+  price        REAL NOT NULL DEFAULT 0,
+  currency     TEXT NOT NULL DEFAULT 'CNY',
+  purchased_at TEXT NOT NULL,
+  UNIQUE(user_id, repo_id)
+);
+CREATE INDEX IF NOT EXISTS idx_purchases_user ON purchases(user_id, purchased_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchases_repo ON purchases(repo_id);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id            TEXT PRIMARY KEY,
+  repo_id       TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rating        INTEGER NOT NULL,
+  title         TEXT NOT NULL DEFAULT '',
+  content       TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  helpful_count INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(user_id, repo_id)
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_repo ON reviews(repo_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
+
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type          TEXT NOT NULL,
+  amount        REAL NOT NULL,
+  balance_after REAL NOT NULL,
+  currency      TEXT NOT NULL DEFAULT 'CNY',
+  description   TEXT NOT NULL DEFAULT '',
+  order_id      TEXT REFERENCES orders(id) ON DELETE SET NULL,
+  reference_id  TEXT,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wallet_user ON wallet_transactions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallet_type ON wallet_transactions(user_id, type);
+CREATE INDEX IF NOT EXISTS idx_wallet_order ON wallet_transactions(order_id);
 `);
 
 // Idempotent migration: add columns to databases created before newer features.
 function ensureColumns(): void {
-  const cols = (db.prepare(`PRAGMA table_info(users)`).all() as any[]).map((c) => c.name);
-  if (!cols.includes('is_admin')) db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
-  if (!cols.includes('is_suspended')) db.exec(`ALTER TABLE users ADD COLUMN is_suspended INTEGER NOT NULL DEFAULT 0`);
-  if (!cols.includes('token_version')) db.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
-  if (!cols.includes('deactivated_at')) db.exec(`ALTER TABLE users ADD COLUMN deactivated_at TEXT`);
+  const userCols = (db.prepare(`PRAGMA table_info(users)`).all() as any[]).map((c) => c.name);
+  if (!userCols.includes('is_admin')) db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
+  if (!userCols.includes('is_suspended')) db.exec(`ALTER TABLE users ADD COLUMN is_suspended INTEGER NOT NULL DEFAULT 0`);
+  if (!userCols.includes('token_version')) db.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
+  if (!userCols.includes('deactivated_at')) db.exec(`ALTER TABLE users ADD COLUMN deactivated_at TEXT`);
+  if (!userCols.includes('wallet_balance')) db.exec(`ALTER TABLE users ADD COLUMN wallet_balance REAL NOT NULL DEFAULT 0`);
+  if (!userCols.includes('total_sales')) db.exec(`ALTER TABLE users ADD COLUMN total_sales INTEGER NOT NULL DEFAULT 0`);
+  if (!userCols.includes('total_purchases')) db.exec(`ALTER TABLE users ADD COLUMN total_purchases INTEGER NOT NULL DEFAULT 0`);
+
+  const repoCols = (db.prepare(`PRAGMA table_info(repos)`).all() as any[]).map((c) => c.name);
+  if (!repoCols.includes('pricing_type')) db.exec(`ALTER TABLE repos ADD COLUMN pricing_type TEXT NOT NULL DEFAULT 'free'`);
+  if (!repoCols.includes('price')) db.exec(`ALTER TABLE repos ADD COLUMN price REAL NOT NULL DEFAULT 0`);
+  if (!repoCols.includes('currency')) db.exec(`ALTER TABLE repos ADD COLUMN currency TEXT NOT NULL DEFAULT 'CNY'`);
+  if (!repoCols.includes('total_sales')) db.exec(`ALTER TABLE repos ADD COLUMN total_sales INTEGER NOT NULL DEFAULT 0`);
+  if (!repoCols.includes('total_revenue')) db.exec(`ALTER TABLE repos ADD COLUMN total_revenue REAL NOT NULL DEFAULT 0`);
+  if (!repoCols.includes('preview_image')) db.exec(`ALTER TABLE repos ADD COLUMN preview_image TEXT`);
+
+  const fileCols = (db.prepare(`PRAGMA table_info(files)`).all() as any[]).map((c) => c.name);
+  if (!fileCols.includes('is_preview')) db.exec(`ALTER TABLE files ADD COLUMN is_preview INTEGER NOT NULL DEFAULT 0`);
 }
 ensureColumns();
+
+// Indexes on columns added by ensureColumns (must run after the migration).
+db.exec(`
+CREATE INDEX IF NOT EXISTS idx_repos_pricing ON repos(pricing_type);
+CREATE INDEX IF NOT EXISTS idx_repos_price ON repos(price);
+`);
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -177,7 +294,6 @@ function splitCsv(value: string | null): string[] {
   return value ? String(value).split(',').filter(Boolean) : [];
 }
 
-// Every user SELECT aliases the aggregates so one row maps into a User object.
 const USER_SELECT = `
 SELECT u.*,
   (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
@@ -201,6 +317,9 @@ function mapUser(row: any): User {
     groupCount: row.group_count,
     totalDownloads: row.total_downloads,
     totalBytes: row.total_bytes,
+    walletBalance: Number(row.wallet_balance ?? 0),
+    totalSales: Number(row.total_sales ?? 0),
+    totalPurchases: Number(row.total_purchases ?? 0),
     isAdmin: Boolean(row.is_admin),
     isSuspended: Boolean(row.is_suspended),
   };
@@ -215,18 +334,23 @@ SELECT p.*,
   (SELECT COUNT(*) FROM group_members gm0 WHERE gm0.user_id = u.id) AS owner_group_count,
   (SELECT COALESCE(SUM(f1.download_count), 0) FROM files f1 JOIN repos r1 ON r1.id = f1.repo_id WHERE r1.owner_id = u.id) AS owner_total_downloads,
   (SELECT COALESCE(SUM(f2.file_bytes), 0) FROM files f2 JOIN repos r2 ON r2.id = f2.repo_id WHERE r2.owner_id = u.id) AS owner_total_bytes,
+  (SELECT COALESCE(u.wallet_balance, 0) FROM users u2 WHERE u2.id = u.id) AS owner_wallet_balance,
+  (SELECT COALESCE(u.total_sales, 0) FROM users u3 WHERE u3.id = u.id) AS owner_total_sales,
+  (SELECT COALESCE(u.total_purchases, 0) FROM users u4 WHERE u4.id = u.id) AS owner_total_purchases,
   (SELECT COUNT(*) FROM files f WHERE f.repo_id = p.id) AS file_count,
   (SELECT COALESCE(SUM(f.file_bytes), 0) FROM files f WHERE f.repo_id = p.id) AS total_bytes,
   (SELECT COALESCE(SUM(f.download_count), 0) FROM files f WHERE f.repo_id = p.id) AS download_count,
   (SELECT COUNT(*) FROM comments c WHERE c.repo_id = p.id) AS comment_count,
   (SELECT COUNT(*) FROM favorites fv WHERE fv.repo_id = p.id) AS favorite_count,
+  (SELECT COUNT(*) FROM reviews rv WHERE rv.repo_id = p.id) AS review_count,
+  (SELECT COALESCE(AVG(rv.rating), 0) FROM reviews rv WHERE rv.repo_id = p.id) AS average_rating,
   (SELECT group_concat(g.id, ',') FROM repo_groups rg JOIN groups g ON g.id = rg.group_id WHERE rg.repo_id = p.id) AS group_ids,
   (SELECT group_concat(g.name, ',') FROM repo_groups rg JOIN groups g ON g.id = rg.group_id WHERE rg.repo_id = p.id) AS group_names
 FROM repos p
 JOIN users u ON u.id = p.owner_id
 `;
 
-function mapRepo(row: any, favoriteIds: Set<string>): Repository {
+function mapRepo(row: any, favoriteIds: Set<string>, purchasedIds: Set<string>): Repository {
   return {
     id: row.id,
     name: row.name,
@@ -244,6 +368,9 @@ function mapRepo(row: any, favoriteIds: Set<string>): Repository {
       groupCount: row.owner_group_count,
       totalDownloads: row.owner_total_downloads,
       totalBytes: row.owner_total_bytes,
+      walletBalance: Number(row.owner_wallet_balance ?? 0),
+      totalSales: Number(row.owner_total_sales ?? 0),
+      totalPurchases: Number(row.owner_total_purchases ?? 0),
     },
     categoryId: row.category_id,
     categoryName: categoryName(row.category_id),
@@ -254,11 +381,20 @@ function mapRepo(row: any, favoriteIds: Set<string>): Repository {
     viewCount: row.view_count,
     commentCount: row.comment_count,
     favoriteCount: row.favorite_count,
+    reviewCount: row.review_count,
+    averageRating: Number(row.average_rating ?? 0),
     groupIds: splitCsv(row.group_ids),
     groupNames: splitCsv(row.group_names),
     createdAt: row.created_at,
+    pricingType: (row.pricing_type ?? 'free') as 'free' | 'paid',
+    price: Number(row.price ?? 0),
+    currency: (row.currency ?? 'CNY') as Currency,
+    totalSales: Number(row.total_sales ?? 0),
+    totalRevenue: Number(row.total_revenue ?? 0),
     isFavorite: favoriteIds.has(row.id),
     isOwner: false,
+    isPurchased: purchasedIds.has(row.id),
+    previewImageUrl: row.preview_image ?? undefined,
   };
 }
 
@@ -275,6 +411,7 @@ function mapFile(row: any): RepoFile {
     downloadCount: row.download_count,
     viewCount: row.view_count,
     createdAt: row.created_at,
+    isPreview: Boolean(row.is_preview),
   };
 }
 
@@ -318,6 +455,9 @@ function mapGroup(
       groupCount: row.creator_group_count,
       totalDownloads: row.creator_total_downloads,
       totalBytes: row.creator_total_bytes,
+      walletBalance: 0,
+      totalSales: 0,
+      totalPurchases: 0,
     },
     memberCount: row.member_count,
     repoCount: row.repo_count,
@@ -335,6 +475,82 @@ function mapMember(row: any): GroupMember {
     joinedAt: row.joined_at,
     user: mapUser(row),
   };
+}
+
+function mapOrder(row: any, buyer: User, seller: User): Order {
+  return {
+    id: row.id,
+    orderNo: row.order_no,
+    buyerId: row.buyer_id,
+    buyer,
+    sellerId: row.seller_id,
+    seller,
+    repoId: row.repo_id,
+    repoName: row.repo_name,
+    repoOwnerId: row.repo_owner_id,
+    quantity: row.quantity,
+    unitPrice: Number(row.unit_price),
+    totalAmount: Number(row.total_amount),
+    currency: row.currency as Currency,
+    platformFee: Number(row.platform_fee),
+    sellerEarning: Number(row.seller_earning),
+    status: row.status as OrderStatus,
+    createdAt: row.created_at,
+    paidAt: row.paid_at ?? undefined,
+    refundedAt: row.refunded_at ?? undefined,
+    cancelledAt: row.cancelled_at ?? undefined,
+  };
+}
+
+function mapReview(row: any, user: User): Review {
+  return {
+    id: row.id,
+    repoId: row.repo_id,
+    userId: row.user_id,
+    user,
+    rating: row.rating as ReviewRating,
+    title: row.title ?? '',
+    content: row.content,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    helpfulCount: Number(row.helpful_count),
+  };
+}
+
+function mapWalletTx(row: any, user?: User): WalletTransaction {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    user: user ?? ({} as User),
+    type: row.type as TransactionType,
+    amount: Number(row.amount),
+    balanceAfter: Number(row.balance_after),
+    currency: row.currency as Currency,
+    description: row.description ?? '',
+    orderId: row.order_id ?? undefined,
+    referenceId: row.reference_id ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Purchased / favorite helpers
+// ---------------------------------------------------------------------------
+
+export function purchasedRepoIdsForUser(userId: string | null): Set<string> {
+  const set = new Set<string>();
+  if (!userId) return set;
+  const rows = db.prepare(`SELECT repo_id FROM purchases WHERE user_id = ?`).all(userId) as any[];
+  for (const r of rows) set.add(r.repo_id);
+  return set;
+}
+
+export function favoriteRepoIdsForUser(userId: string | null): Set<string> {
+  const set = new Set<string>();
+  if (!userId) return set;
+  const rows = db.prepare(`SELECT repo_id FROM favorites WHERE user_id = ?`).all(userId) as any[];
+  for (const r of rows) set.add(r.repo_id);
+  return set;
 }
 
 // ---------------------------------------------------------------------------
@@ -366,8 +582,8 @@ export function createUser(input: {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO users (id, username, email, nickname, password_hash, avatar_url, bio, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, '', ?)`,
+    `INSERT INTO users (id, username, email, nickname, password_hash, avatar_url, bio, created_at, wallet_balance, total_sales, total_purchases)
+     VALUES (?, ?, ?, ?, ?, ?, '', ?, 0, 0, 0)`,
   ).run(id, input.username, input.email, input.nickname, input.passwordHash, input.avatarUrl, now);
   return getUserById(id)!;
 }
@@ -391,24 +607,35 @@ export function setUserPassword(id: string, hash: string): void {
   db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(hash, id);
 }
 
+export function adjustWalletBalance(userId: string, delta: number): number {
+  db.prepare(`UPDATE users SET wallet_balance = wallet_balance + ? WHERE id = ?`).run(delta, userId);
+  return Number((db.prepare(`SELECT wallet_balance FROM users WHERE id = ?`).get(userId) as any).wallet_balance);
+}
+
+export function incrementUserSales(userId: string, amountRevenue: number = 0): void {
+  db.prepare(`UPDATE users SET total_sales = total_sales + 1 WHERE id = ?`).run(userId);
+  if (amountRevenue) {
+    // revenue tracking could be added; for now total_sales count is enough
+  }
+}
+
+export function incrementUserPurchases(userId: string): void {
+  db.prepare(`UPDATE users SET total_purchases = total_purchases + 1 WHERE id = ?`).run(userId);
+}
+
 // ---------------------------------------------------------------------------
 // Repositories
 // ---------------------------------------------------------------------------
 
-export function favoriteRepoIdsForUser(userId: string | null): Set<string> {
-  const set = new Set<string>();
-  if (!userId) return set;
-  const rows = db.prepare(`SELECT repo_id FROM favorites WHERE user_id = ?`).all(userId) as any[];
-  for (const r of rows) set.add(r.repo_id);
-  return set;
-}
-
 export interface ListReposArgs {
   search?: string;
   category?: string;
-  sort?: 'recent' | 'popular' | 'views';
+  sort?: 'recent' | 'popular' | 'views' | 'price_asc' | 'price_desc' | 'rating' | 'sales';
+  pricingType?: 'free' | 'paid';
   ownerId?: string;
   groupId?: string;
+  minPrice?: number;
+  maxPrice?: number;
   limit: number;
   offset: number;
 }
@@ -423,6 +650,18 @@ export function listRepos(args: ListReposArgs, currentUserId: string | null): { 
   if (args.category) {
     where.push(`p.category_id = ?`);
     params.push(args.category);
+  }
+  if (args.pricingType) {
+    where.push(`p.pricing_type = ?`);
+    params.push(args.pricingType);
+  }
+  if (args.minPrice !== undefined) {
+    where.push(`p.price >= ?`);
+    params.push(args.minPrice);
+  }
+  if (args.maxPrice !== undefined) {
+    where.push(`p.price <= ?`);
+    params.push(args.maxPrice);
   }
   if (args.ownerId) {
     where.push(`p.owner_id = ?`);
@@ -439,13 +678,22 @@ export function listRepos(args: ListReposArgs, currentUserId: string | null): { 
       ? 'ORDER BY download_count DESC, view_count DESC'
       : args.sort === 'views'
         ? 'ORDER BY p.view_count DESC'
-        : 'ORDER BY p.created_at DESC';
+        : args.sort === 'price_asc'
+          ? "ORDER BY CASE WHEN p.pricing_type='free' THEN 0 ELSE 1 END ASC, p.price ASC"
+          : args.sort === 'price_desc'
+            ? "ORDER BY CASE WHEN p.pricing_type='free' THEN 0 ELSE 1 END DESC, p.price DESC"
+            : args.sort === 'rating'
+              ? 'ORDER BY average_rating DESC NULLS LAST, review_count DESC'
+              : args.sort === 'sales'
+                ? 'ORDER BY p.total_sales DESC, p.total_revenue DESC'
+                : 'ORDER BY p.created_at DESC';
 
   const total = (db.prepare(`SELECT COUNT(*) AS c FROM repos p ${whereSql}`).get(...params) as any).c;
   const rows = db.prepare(`${REPO_SELECT} ${whereSql} ${orderBy} LIMIT ? OFFSET ?`).all(...params, args.limit, args.offset) as any[];
 
   const favorites = favoriteRepoIdsForUser(currentUserId);
-  return { items: rows.map((r) => mapRepo(r, favorites)), total };
+  const purchased = purchasedRepoIdsForUser(currentUserId);
+  return { items: rows.map((r) => mapRepo(r, favorites, purchased)), total };
 }
 
 export function getRepoById(id: string, currentUserId: string | null, incrementView = false): Repository | null {
@@ -455,14 +703,14 @@ export function getRepoById(id: string, currentUserId: string | null, incrementV
     db.prepare(`UPDATE repos SET view_count = view_count + 1 WHERE id = ?`).run(id);
     row.view_count += 1;
   }
-  const repo = mapRepo(row, favoriteRepoIdsForUser(currentUserId));
+  const repo = mapRepo(row, favoriteRepoIdsForUser(currentUserId), purchasedRepoIdsForUser(currentUserId));
   repo.isOwner = currentUserId === repo.ownerId;
   return repo;
 }
 
 export function listRepoFiles(repoId: string): RepoFile[] {
   const rows = db
-    .prepare(`SELECT * FROM files WHERE repo_id = ? ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM files WHERE repo_id = ? ORDER BY is_preview DESC, created_at DESC`)
     .all(repoId) as any[];
   return rows.map(mapFile);
 }
@@ -478,26 +726,65 @@ export function createRepo(input: {
   categoryId: string;
   tags: string[];
   ownerId: string;
+  pricingType: 'free' | 'paid';
+  price: number;
+  currency: Currency;
+  previewImageUrl?: string;
 }): Repository {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO repos (id, name, description, owner_id, category_id, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, input.name, input.description, input.ownerId, input.categoryId, JSON.stringify(input.tags), now);
+    `INSERT INTO repos (id, name, description, owner_id, category_id, tags, created_at, pricing_type, price, currency, total_sales, total_revenue, preview_image)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`,
+  ).run(
+    id,
+    input.name,
+    input.description,
+    input.ownerId,
+    input.categoryId,
+    JSON.stringify(input.tags),
+    now,
+    input.pricingType,
+    input.price,
+    input.currency,
+    input.previewImageUrl ?? null,
+  );
   return getRepoById(id, input.ownerId, false)!;
 }
 
 export function updateRepo(
   id: string,
-  patch: { name?: string; description?: string; categoryId?: string; tags?: string[] },
+  patch: {
+    name?: string;
+    description?: string;
+    categoryId?: string;
+    tags?: string[];
+    pricingType?: 'free' | 'paid';
+    price?: number;
+    currency?: Currency;
+    previewImageUrl?: string | null;
+  },
 ): Repository | null {
   db.prepare(
-    `UPDATE repos SET name = COALESCE(?, name), description = COALESCE(?, description), category_id = COALESCE(?, category_id), tags = COALESCE(?, tags) WHERE id = ?`,
+    `UPDATE repos SET
+       name = COALESCE(?, name),
+       description = COALESCE(?, description),
+       category_id = COALESCE(?, category_id),
+       tags = COALESCE(?, tags),
+       pricing_type = COALESCE(?, pricing_type),
+       price = COALESCE(?, price),
+       currency = COALESCE(?, currency),
+       preview_image = COALESCE(?, preview_image)
+     WHERE id = ?`,
   ).run(
     patch.name ?? null,
     patch.description ?? null,
     patch.categoryId ?? null,
     patch.tags ? JSON.stringify(patch.tags) : null,
+    patch.pricingType ?? null,
+    patch.price ?? null,
+    patch.currency ?? null,
+    patch.previewImageUrl !== undefined ? (patch.previewImageUrl ?? null) : undefined,
     id,
   );
   return getRepoById(id, null, false);
@@ -515,12 +802,13 @@ export function addFileToRepo(input: {
   fileSize: string;
   fileBytes: number;
   filePath: string;
+  isPreview?: boolean;
 }): RepoFile {
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO files (id, repo_id, title, description, file_type, file_size, file_bytes, file_path, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO files (id, repo_id, title, description, file_type, file_size, file_bytes, file_path, created_at, is_preview)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.repoId,
@@ -531,6 +819,7 @@ export function addFileToRepo(input: {
     input.fileBytes,
     input.filePath,
     now,
+    input.isPreview ? 1 : 0,
   );
   return getRepoFileById(id)!;
 }
@@ -539,9 +828,17 @@ export function incrementFileDownload(fileId: string): void {
   db.prepare(`UPDATE files SET download_count = download_count + 1 WHERE id = ?`).run(fileId);
 }
 
+export function incrementRepoSales(repoId: string, revenue: number): void {
+  db.prepare(`UPDATE repos SET total_sales = total_sales + 1, total_revenue = total_revenue + ? WHERE id = ?`).run(revenue, repoId);
+}
+
+export function hasUserPurchasedRepo(userId: string, repoId: string): boolean {
+  return Boolean(db.prepare(`SELECT 1 FROM purchases WHERE user_id = ? AND repo_id = ?`).get(userId, repoId));
+}
+
 export function listReposByOwner(userId: string): Repository[] {
   const rows = db.prepare(`${REPO_SELECT} WHERE p.owner_id = ? ORDER BY p.created_at DESC`).all(userId) as any[];
-  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(userId)));
+  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(userId), purchasedRepoIdsForUser(userId)));
 }
 
 export function listFavorites(userId: string): Repository[] {
@@ -550,7 +847,51 @@ export function listFavorites(userId: string): Repository[] {
       `${REPO_SELECT} JOIN favorites fv ON fv.repo_id = p.id WHERE fv.user_id = ? ORDER BY fv.created_at DESC`,
     )
     .all(userId) as any[];
-  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(userId)));
+  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(userId), purchasedRepoIdsForUser(userId)));
+}
+
+export function listPurchases(userId: string): PurchaseRecord[] {
+  const rows = db
+    .prepare(
+      `SELECT p.*, pr.*
+       FROM purchases p
+       JOIN repos pr ON pr.id = p.repo_id
+       WHERE p.user_id = ?
+       ORDER BY p.purchased_at DESC`,
+    )
+    .all(userId) as any[];
+  const favs = favoriteRepoIdsForUser(userId);
+  const purchased = purchasedRepoIdsForUser(userId);
+  return rows.map((row) => {
+    // Repo SELECT enriched fields require separate query, fallback minimal
+    const repo = getRepoById(row.repo_id, userId) ?? ({} as Repository);
+    return {
+      id: row.id,
+      orderId: row.order_id,
+      userId: row.user_id,
+      repoId: row.repo_id,
+      repo,
+      price: Number(row.price),
+      currency: row.currency as Currency,
+      purchasedAt: row.purchased_at,
+    };
+  });
+}
+
+export function getPurchaseByOrder(orderId: string): PurchaseRecord | null {
+  const row = db.prepare(`SELECT * FROM purchases WHERE order_id = ?`).get(orderId) as any;
+  if (!row) return null;
+  const repo = getRepoById(row.repo_id, row.user_id) ?? ({} as Repository);
+  return {
+    id: row.id,
+    orderId: row.order_id,
+    userId: row.user_id,
+    repoId: row.repo_id,
+    repo,
+    price: Number(row.price),
+    currency: row.currency as Currency,
+    purchasedAt: row.purchased_at,
+  };
 }
 
 export function toggleFavoriteRepo(repoId: string, userId: string): boolean {
@@ -588,23 +929,294 @@ export function listReposInGroup(groupId: string, currentUserId: string | null):
        ORDER BY rg.rowid DESC`,
     )
     .all(groupId) as any[];
-  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(currentUserId)));
+  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(currentUserId), purchasedRepoIdsForUser(currentUserId)));
 }
 
 export function listRecentRepos(limit: number, currentUserId: string | null): Repository[] {
   const rows = db.prepare(`${REPO_SELECT} ORDER BY p.created_at DESC LIMIT ?`).all(limit) as any[];
-  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(currentUserId)));
+  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(currentUserId), purchasedRepoIdsForUser(currentUserId)));
 }
 
 export function listHotRepos(limit: number, currentUserId: string | null): Repository[] {
   const rows = db
-    .prepare(`${REPO_SELECT} ORDER BY download_count DESC, p.view_count DESC LIMIT ?`)
+    .prepare(`${REPO_SELECT} ORDER BY download_count DESC, p.total_sales DESC, p.view_count DESC LIMIT ?`)
     .all(limit) as any[];
-  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(currentUserId)));
+  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(currentUserId), purchasedRepoIdsForUser(currentUserId)));
+}
+
+export function listFreeRepos(limit: number, currentUserId: string | null): Repository[] {
+  const rows = db
+    .prepare(`${REPO_SELECT} WHERE p.pricing_type = 'free' ORDER BY p.created_at DESC LIMIT ?`)
+    .all(limit) as any[];
+  return rows.map((r) => mapRepo(r, favoriteRepoIdsForUser(currentUserId), purchasedRepoIdsForUser(currentUserId)));
 }
 
 // ---------------------------------------------------------------------------
-// Comments
+// Orders / Checkout
+// ---------------------------------------------------------------------------
+
+export function createOrder(input: {
+  buyerId: string;
+  sellerId: string;
+  repoId: string;
+  repoName: string;
+  repoOwnerId: string;
+  quantity?: number;
+  unitPrice: number;
+  currency: Currency;
+  platformFee: number;
+  sellerEarning: number;
+}): Order {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  const orderNo = generateOrderNo();
+  const quantity = Math.max(1, Math.floor(input.quantity ?? 1));
+  const totalAmount = input.unitPrice * quantity;
+  db.prepare(
+    `INSERT INTO orders (id, order_no, buyer_id, seller_id, repo_id, repo_name, repo_owner_id, quantity, unit_price, total_amount, currency, platform_fee, seller_earning, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+  ).run(
+    id,
+    orderNo,
+    input.buyerId,
+    input.sellerId,
+    input.repoId,
+    input.repoName,
+    input.repoOwnerId,
+    quantity,
+    input.unitPrice,
+    totalAmount,
+    input.currency,
+    input.platformFee,
+    input.sellerEarning,
+    now,
+  );
+  return getOrderById(id)!;
+}
+
+export function getOrderById(id: string): Order | null {
+  const row = db.prepare(`SELECT * FROM orders WHERE id = ?`).get(id) as any;
+  if (!row) return null;
+  const buyer = getUserById(row.buyer_id) ?? ({} as User);
+  const seller = getUserById(row.seller_id) ?? ({} as User);
+  return mapOrder(row, buyer, seller);
+}
+
+export function getOrderByNo(orderNo: string): Order | null {
+  const row = db.prepare(`SELECT * FROM orders WHERE order_no = ?`).get(orderNo) as any;
+  if (!row) return null;
+  const buyer = getUserById(row.buyer_id) ?? ({} as User);
+  const seller = getUserById(row.seller_id) ?? ({} as User);
+  return mapOrder(row, buyer, seller);
+}
+
+export function listOrdersByBuyer(userId: string, limit = 50, offset = 0): { items: Order[]; total: number } {
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM orders WHERE buyer_id = ?`).get(userId) as any).c;
+  const rows = db
+    .prepare(`SELECT * FROM orders WHERE buyer_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(userId, limit, offset) as any[];
+  const sellerCache = new Map<string, User>();
+  const items = rows.map((row) => {
+    let seller = sellerCache.get(row.seller_id);
+    if (!seller) {
+      seller = getUserById(row.seller_id) ?? ({} as User);
+      sellerCache.set(row.seller_id, seller);
+    }
+    const buyer = getUserById(row.buyer_id) ?? ({} as User);
+    return mapOrder(row, buyer, seller);
+  });
+  return { items, total };
+}
+
+export function listOrdersBySeller(userId: string, limit = 50, offset = 0): { items: Order[]; total: number } {
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM orders WHERE seller_id = ?`).get(userId) as any).c;
+  const rows = db
+    .prepare(`SELECT * FROM orders WHERE seller_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(userId, limit, offset) as any[];
+  const buyerCache = new Map<string, User>();
+  const items = rows.map((row) => {
+    let buyer = buyerCache.get(row.buyer_id);
+    if (!buyer) {
+      buyer = getUserById(row.buyer_id) ?? ({} as User);
+      buyerCache.set(row.buyer_id, buyer);
+    }
+    const seller = getUserById(row.seller_id) ?? ({} as User);
+    return mapOrder(row, buyer, seller);
+  });
+  return { items, total };
+}
+
+export function listUserOrders(args: {
+  userId: string;
+  role: 'buyer' | 'seller';
+  status?: OrderStatus;
+  limit?: number;
+  offset?: number;
+}): { items: Order[]; total: number } {
+  const { userId, role, status } = args;
+  const limit = Math.min(Math.max(Number(args.limit) || 20, 1), 100);
+  const offset = Math.max(Number(args.offset) || 0, 0);
+  const column = role === 'seller' ? 'seller_id' : 'buyer_id';
+  const where = [`${column} = ?`];
+  const params: unknown[] = [userId];
+  if (status) {
+    where.push(`status = ?`);
+    params.push(status);
+  }
+  const whereSql = where.join(' AND ');
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM orders WHERE ${whereSql}`).get(...params) as any).c;
+  const rows = db
+    .prepare(`SELECT * FROM orders WHERE ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(...params, limit, offset) as any[];
+  const personCache = new Map<string, User>();
+  const items = rows.map((row) => {
+    const buyerId = role === 'seller' ? row.buyer_id : userId;
+    const sellerId = role === 'buyer' ? row.seller_id : userId;
+    let buyer = personCache.get(buyerId);
+    if (!buyer) {
+      buyer = getUserById(buyerId) ?? ({} as User);
+      personCache.set(buyerId, buyer);
+    }
+    let seller = personCache.get(sellerId);
+    if (!seller) {
+      seller = getUserById(sellerId) ?? ({} as User);
+      personCache.set(sellerId, seller);
+    }
+    return mapOrder(row, buyer, seller);
+  });
+  return { items, total };
+}
+
+export interface PayOrderResult {
+  success: boolean;
+  order?: Order;
+  purchase?: PurchaseRecord;
+  error?: string;
+  code?: string;
+}
+
+export function payOrderWithWallet(orderId: string, buyerId: string): PayOrderResult {
+  const order = getOrderById(orderId);
+  if (!order) return { success: false, error: 'Order not found', code: 'order_not_found' };
+  if (order.buyerId !== buyerId) return { success: false, error: 'Not your order', code: 'not_your_order' };
+  if (order.status !== 'pending') {
+    return { success: false, error: `Order is already ${order.status}`, code: 'already_paid' };
+  }
+  if (order.totalAmount > 0) {
+    const buyer = getUserById(buyerId);
+    if (!buyer || buyer.walletBalance < order.totalAmount) {
+      return { success: false, error: 'Insufficient wallet balance', code: 'insufficient_balance' };
+    }
+  }
+
+  const tx = db.transaction(() => {
+    const now = new Date().toISOString();
+    // Mark order paid
+    db.prepare(`UPDATE orders SET status = 'paid', paid_at = ? WHERE id = ?`).run(now, order.id);
+
+    // Charge buyer wallet
+    if (order.totalAmount > 0) {
+      const buyerNewBal = adjustWalletBalance(buyerId, -order.totalAmount);
+      recordWalletTx({
+        userId: buyerId,
+        type: 'purchase',
+        amount: -order.totalAmount,
+        balanceAfter: buyerNewBal,
+        currency: order.currency,
+        description: `Purchase: ${order.repoName}`,
+        orderId: order.id,
+      });
+    }
+
+    // Create purchase record (UNIQUE protects against double purchase)
+    db.prepare(
+      `INSERT OR IGNORE INTO purchases (id, order_id, user_id, repo_id, price, currency, purchased_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(randomUUID(), order.id, buyerId, order.repoId, order.unitPrice, order.currency, now);
+
+    // Credit seller wallet + record sale transaction
+    if (order.sellerEarning > 0) {
+      const sellerNewBal = adjustWalletBalance(order.sellerId, order.sellerEarning);
+      recordWalletTx({
+        userId: order.sellerId,
+        type: 'sale',
+        amount: order.sellerEarning,
+        balanceAfter: sellerNewBal,
+        currency: order.currency,
+        description: `Sale: ${order.repoName} (order ${order.orderNo})`,
+        orderId: order.id,
+      });
+    }
+
+    // Increment counters
+    incrementRepoSales(order.repoId, order.sellerEarning);
+    incrementUserSales(order.sellerId);
+    incrementUserPurchases(buyerId);
+  });
+
+  try {
+    tx();
+    return { success: true, order: getOrderById(orderId)!, purchase: getPurchaseByOrder(orderId) ?? undefined };
+  } catch (err: any) {
+    return { success: false, error: err?.message ?? 'Payment failed', code: 'payment_failed' };
+  }
+}
+
+export function refundOrder(orderId: string, adminId: string, reason = ''): PayOrderResult {
+  const order = getOrderById(orderId);
+  if (!order) return { success: false, error: 'Order not found', code: 'order_not_found' };
+  if (order.status !== 'paid') {
+    return { success: false, error: 'Only paid orders can be refunded', code: 'not_refundable' };
+  }
+
+  const tx = db.transaction(() => {
+    const now = new Date().toISOString();
+    db.prepare(`UPDATE orders SET status = 'refunded', refunded_at = ? WHERE id = ?`).run(now, order.id);
+
+    // Reverse buyer charge
+    if (order.totalAmount > 0) {
+      const bal = adjustWalletBalance(order.buyerId, order.totalAmount);
+      recordWalletTx({
+        userId: order.buyerId,
+        type: 'refund',
+        amount: order.totalAmount,
+        balanceAfter: bal,
+        currency: order.currency,
+        description: `Refund for order ${order.orderNo}${reason ? ` - ${reason}` : ''}`,
+        orderId: order.id,
+      });
+    }
+    // Reverse seller credit
+    if (order.sellerEarning > 0) {
+      const bal2 = adjustWalletBalance(order.sellerId, -order.sellerEarning);
+      recordWalletTx({
+        userId: order.sellerId,
+        type: 'refund',
+        amount: -order.sellerEarning,
+        balanceAfter: bal2,
+        currency: order.currency,
+        description: `Reverse earning for refunded order ${order.orderNo}`,
+        orderId: order.id,
+      });
+    }
+    // Remove purchase record (user loses access)
+    db.prepare(`DELETE FROM purchases WHERE order_id = ?`).run(order.id);
+    // Roll back repo sales counters (approximate: decrement by 1, revenue subtract seller earning)
+    db.prepare(`UPDATE repos SET total_sales = MAX(0, total_sales - 1), total_revenue = MAX(0, total_revenue - ?) WHERE id = ?`).run(order.sellerEarning, order.repoId);
+    db.prepare(`UPDATE users SET total_sales = MAX(0, total_sales - 1) WHERE id = ?`).run(order.sellerId);
+    db.prepare(`UPDATE users SET total_purchases = MAX(0, total_purchases - 1) WHERE id = ?`).run(order.buyerId);
+  });
+
+  try {
+    tx();
+    return { success: true, order: getOrderById(orderId)! };
+  } catch (err: any) {
+    return { success: false, error: err?.message ?? 'Refund failed', code: 'refund_failed' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Comments / Reviews
 // ---------------------------------------------------------------------------
 
 export function listRepoComments(repoId: string): Comment[] {
@@ -617,7 +1229,10 @@ export function listRepoComments(repoId: string): Comment[] {
               (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
               (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
               (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
-              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes
+              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+              u.wallet_balance AS owner_wallet_balance,
+              u.total_sales AS owner_total_sales,
+              u.total_purchases AS owner_total_purchases
        FROM comments c
        JOIN users u ON u.id = c.user_id
        WHERE c.repo_id = ?
@@ -651,6 +1266,192 @@ export function createRepoComment(repoId: string, userId: string, content: strin
   return listRepoComments(repoId).find((c) => c.id === id)!;
 }
 
+export function listRepoReviews(repoId: string): Review[] {
+  const rows = db
+    .prepare(
+      `SELECT rv.*,
+              u.username AS username, u.nickname AS nickname, u.avatar_url AS avatar_url,
+              u.bio AS bio, u.created_at AS user_created_at,
+              (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
+              (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
+              (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
+              (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
+              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+              u.wallet_balance AS owner_wallet_balance,
+              u.total_sales AS owner_total_sales,
+              u.total_purchases AS owner_total_purchases
+       FROM reviews rv
+       JOIN users u ON u.id = rv.user_id
+       WHERE rv.repo_id = ?
+       ORDER BY rv.created_at DESC`,
+    )
+    .all(repoId) as any[];
+  return rows.map((row) => mapReview(row, mapUser(row)));
+}
+
+export function canUserReviewRepo(userId: string, repoId: string): boolean {
+  // Must have purchased, and not already reviewed
+  const purchased = hasUserPurchasedRepo(userId, repoId);
+  if (!purchased) {
+    // Owner or free resource also allowed? Owner always. Free: allow everyone.
+    const repo = getRepoById(repoId, null);
+    if (!repo) return false;
+    if (repo.ownerId === userId) return true;
+    if (repo.pricingType === 'free') return true;
+    return false;
+  }
+  const reviewed = Boolean(db.prepare(`SELECT 1 FROM reviews WHERE user_id = ? AND repo_id = ?`).get(userId, repoId));
+  return !reviewed;
+}
+
+export function createReview(input: {
+  repoId: string;
+  userId: string;
+  rating: ReviewRating;
+  title?: string;
+  content: string;
+}): Review {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO reviews (id, repo_id, user_id, rating, title, content, created_at, updated_at, helpful_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+  ).run(id, input.repoId, input.userId, input.rating, input.title ?? '', input.content, now, now);
+  return listRepoReviews(input.repoId).find((r) => r.id === id)!;
+}
+
+export function updateReview(id: string, patch: { rating?: ReviewRating; title?: string; content?: string }): Review | null {
+  const row = db.prepare(`SELECT repo_id FROM reviews WHERE id = ?`).get(id) as any;
+  if (!row) return null;
+  db.prepare(
+    `UPDATE reviews SET
+       rating = COALESCE(?, rating),
+       title = COALESCE(?, title),
+       content = COALESCE(?, content),
+       updated_at = ?
+     WHERE id = ?`,
+  ).run(
+    patch.rating ?? null,
+    patch.title ?? null,
+    patch.content ?? null,
+    new Date().toISOString(),
+    id,
+  );
+  return listRepoReviews(row.repo_id).find((r) => r.id === id) ?? null;
+}
+
+export function deleteReview(id: string): void {
+  db.prepare(`DELETE FROM reviews WHERE id = ?`).run(id);
+}
+
+export function getReviewById(id: string): Review | null {
+  const row = db.prepare(`SELECT * FROM reviews WHERE id = ?`).get(id) as any;
+  if (!row) return null;
+  const user = getUserById(row.user_id) ?? ({} as User);
+  return mapReview(row, user);
+}
+
+// ---------------------------------------------------------------------------
+// Wallet
+// ---------------------------------------------------------------------------
+
+export function recordWalletTx(input: {
+  userId: string;
+  type: TransactionType;
+  amount: number;
+  balanceAfter: number;
+  currency: Currency;
+  description: string;
+  orderId?: string;
+  referenceId?: string;
+}): WalletTransaction {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO wallet_transactions (id, user_id, type, amount, balance_after, currency, description, order_id, reference_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    input.userId,
+    input.type,
+    input.amount,
+    input.balanceAfter,
+    input.currency,
+    input.description,
+    input.orderId ?? null,
+    input.referenceId ?? null,
+    now,
+  );
+  const user = getUserById(input.userId) ?? ({} as User);
+  return mapWalletTx({ ...input, id, created_at: now }, user);
+}
+
+export function getWalletOverview(userId: string): WalletOverview {
+  const user = getUserById(userId) ?? ({} as User);
+  const balance = user.walletBalance ?? 0;
+  const totalIncome = Number(
+    (db.prepare(`SELECT COALESCE(SUM(amount), 0) AS c FROM wallet_transactions WHERE user_id = ? AND amount > 0`).get(userId) as any).c,
+  );
+  const totalExpense = Math.abs(
+    Number(
+      (db.prepare(`SELECT COALESCE(SUM(amount), 0) AS c FROM wallet_transactions WHERE user_id = ? AND amount < 0`).get(userId) as any).c,
+    ),
+  );
+  const rows = db
+    .prepare(`SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 20`)
+    .all(userId) as any[];
+  const u = getUserById(userId);
+  return {
+    balance,
+    currency: 'CNY',
+    totalIncome,
+    totalExpense,
+    pendingEarnings: 0,
+    recentTransactions: rows.map((row) => mapWalletTx(row, u ?? undefined)),
+  };
+}
+
+export function listWalletTransactions(args: {
+  userId: string;
+  type?: TransactionType;
+  limit?: number;
+  offset?: number;
+}): { items: WalletTransaction[]; total: number } {
+  const { userId, type } = args;
+  const limit = Math.min(Math.max(Number(args.limit) || 30, 1), 100);
+  const offset = Math.max(Number(args.offset) || 0, 0);
+  const where = [`user_id = ?`];
+  const params: unknown[] = [userId];
+  if (type) {
+    where.push(`type = ?`);
+    params.push(type);
+  }
+  const whereSql = where.join(' AND ');
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM wallet_transactions WHERE ${whereSql}`).get(...params) as any).c;
+  const rows = db
+    .prepare(`SELECT * FROM wallet_transactions WHERE ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+    .all(...params, limit, offset) as any[];
+  const u = getUserById(userId);
+  return {
+    items: rows.map((row) => mapWalletTx(row, u ?? undefined)),
+    total,
+  };
+}
+
+export function topUpWallet(userId: string, amount: number, currency: Currency): WalletOverview {
+  const bal = adjustWalletBalance(userId, amount);
+  recordWalletTx({
+    userId,
+    type: 'topup',
+    amount,
+    balanceAfter: bal,
+    currency,
+    description: 'Wallet top-up (admin)',
+    referenceId: `topup_${Date.now()}`,
+  });
+  return getWalletOverview(userId);
+}
+
 // ---------------------------------------------------------------------------
 // Groups
 // ---------------------------------------------------------------------------
@@ -673,7 +1474,6 @@ export function adminGroupIdsForUser(userId: string | null): Set<string> {
   return set;
 }
 
-/** Map of groupId -> request status for the user's pending join requests. */
 export function pendingRequestsForUser(userId: string | null): Map<string, 'pending'> {
   const map = new Map<string, 'pending'>();
   if (!userId) return map;
@@ -776,7 +1576,6 @@ export function groupRole(groupId: string, userId: string): 'admin' | 'member' |
   return row?.role ?? null;
 }
 
-/** Returns 'created' | 'pending' | 'already-member'. */
 export function requestToJoin(groupId: string, userId: string): 'created' | 'pending' | 'already-member' {
   if (groupRole(groupId, userId)) return 'already-member';
   const existing = db
@@ -808,7 +1607,10 @@ export function listGroupRequests(groupId: string): GroupRequest[] {
               (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
               (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
               (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
-              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes
+              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+              u.wallet_balance AS owner_wallet_balance,
+              u.total_sales AS owner_total_sales,
+              u.total_purchases AS owner_total_purchases
        FROM group_requests gr
        JOIN users u ON u.id = gr.user_id
        WHERE gr.group_id = ?
@@ -864,7 +1666,10 @@ export function listGroupMembers(groupId: string): GroupMember[] {
               (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
               (SELECT COUNT(*) FROM group_members g2 WHERE g2.user_id = u.id) AS group_count,
               (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
-              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes
+              (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+              u.wallet_balance AS owner_wallet_balance,
+              u.total_sales AS owner_total_sales,
+              u.total_purchases AS owner_total_purchases
        FROM group_members gm
        JOIN users u ON u.id = gm.user_id
        WHERE gm.group_id = ?
@@ -910,7 +1715,47 @@ export function getLeaderboard(limit = 50): LeaderboardEntry[] {
     .all(limit) as any[];
   return rows.map((row) => {
     const user = mapUser(row);
-    return { user, repoCount: user.repoCount, fileCount: user.fileCount, totalBytes: user.totalBytes, totalDownloads: user.totalDownloads };
+    return {
+      user,
+      repoCount: user.repoCount,
+      fileCount: user.fileCount,
+      totalBytes: user.totalBytes,
+      totalDownloads: user.totalDownloads,
+      totalSales: user.totalSales,
+      totalRevenue: 0, // per user revenue not tracked in users table yet; skip
+    };
+  });
+}
+
+export function getTopSellers(limit = 20): LeaderboardEntry[] {
+  const rows = db
+    .prepare(
+      `SELECT u.*,
+         (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
+         (SELECT COUNT(*) FROM files f JOIN repos r ON r.id = f.repo_id WHERE r.owner_id = u.id) AS file_count,
+         (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
+         (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r2 ON r2.id = f2.repo_id WHERE r2.owner_id = u.id) AS total_downloads,
+         (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r3 ON r3.id = f3.repo_id WHERE r3.owner_id = u.id) AS total_bytes,
+         (SELECT COALESCE(SUM(r4.total_revenue), 0) FROM repos r4 WHERE r4.owner_id = u.id) AS seller_revenue,
+         (SELECT AVG(rv.rating) FROM reviews rv JOIN repos r5 ON r5.id = rv.repo_id WHERE r5.owner_id = u.id) AS seller_rating
+       FROM users u
+       WHERE u.total_sales > 0
+       ORDER BY u.total_sales DESC
+       LIMIT ?`,
+    )
+    .all(limit) as any[];
+  return rows.map((row) => {
+    const user = mapUser(row);
+    return {
+      user,
+      repoCount: user.repoCount,
+      fileCount: user.fileCount,
+      totalBytes: user.totalBytes,
+      totalDownloads: user.totalDownloads,
+      totalSales: user.totalSales,
+      totalRevenue: Number(row.seller_revenue ?? 0),
+      averageRating: Number(row.seller_rating ?? 0),
+    };
   });
 }
 
@@ -922,6 +1767,9 @@ export function getStats(): HomeData['stats'] {
     groups: count('groups'),
     users: count('users'),
     downloads: (db.prepare(`SELECT COALESCE(SUM(download_count), 0) AS c FROM files`).get() as any).c,
+    totalSales: (db.prepare(`SELECT COALESCE(SUM(total_sales), 0) AS c FROM repos`).get() as any).c,
+    totalRevenue: (db.prepare(`SELECT COALESCE(SUM(total_revenue), 0) AS c FROM repos`).get() as any).c,
+    freeRepos: (db.prepare(`SELECT COUNT(*) AS c FROM repos WHERE pricing_type = 'free'`).get() as any).c,
   };
 }
 
@@ -965,7 +1813,6 @@ export function setUserSuspended(userId: string, suspended: boolean): void {
   db.prepare(`UPDATE users SET is_suspended = ? WHERE id = ?`).run(suspended ? 1 : 0, userId);
 }
 
-/** Permanently deletes a user; cascades to their repos, files, memberships, comments, favorites and reports. */
 export function deleteUser(userId: string): void {
   db.prepare(`DELETE FROM users WHERE id = ?`).run(userId);
 }
@@ -1019,13 +1866,18 @@ export function listReports(args: {
               (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
               (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
               (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+              u.wallet_balance AS owner_wallet_balance,
+              u.total_sales AS owner_total_sales,
+              u.total_purchases AS owner_total_purchases,
               CASE rp.target_type
                 WHEN 'repo' THEN (SELECT name FROM repos WHERE id = rp.target_id)
                 WHEN 'comment' THEN (SELECT r.name FROM comments c JOIN repos r ON r.id = c.repo_id WHERE c.id = rp.target_id)
+                WHEN 'review' THEN (SELECT r.name FROM reviews rv JOIN repos r ON r.id = rv.repo_id WHERE rv.id = rp.target_id)
               END AS target_name,
               CASE rp.target_type
                 WHEN 'repo' THEN rp.target_id
                 WHEN 'comment' THEN (SELECT c.repo_id FROM comments c WHERE c.id = rp.target_id)
+                WHEN 'review' THEN (SELECT rv.repo_id FROM reviews rv WHERE rv.id = rp.target_id)
               END AS target_repo_id
        FROM reports rp
        JOIN users u ON u.id = rp.reporter_id
@@ -1051,11 +1903,19 @@ export function listReports(args: {
   };
 }
 
-export function getAdminOverview(): { stats: HomeData['stats']; comments: number; openReports: number } {
+export function getAdminOverview(): {
+  stats: HomeData['stats'];
+  comments: number;
+  openReports: number;
+  orders: number;
+  revenue: number;
+} {
   return {
     stats: getStats(),
     comments: (db.prepare(`SELECT COUNT(*) AS c FROM comments`).get() as any).c,
     openReports: countOpenReports(),
+    orders: (db.prepare(`SELECT COUNT(*) AS c FROM orders WHERE status = 'paid'`).get() as any).c,
+    revenue: getStats().totalRevenue,
   };
 }
 
@@ -1071,7 +1931,6 @@ export function deleteComment(commentId: string): void {
   db.prepare(`DELETE FROM comments WHERE id = ?`).run(commentId);
 }
 
-/** Deletes a file row and returns it (so the caller can remove the disk file). */
 export function deleteFileById(fileId: string): RepoFile | null {
   const file = getRepoFileById(fileId);
   if (!file) return null;
@@ -1079,11 +1938,39 @@ export function deleteFileById(fileId: string): RepoFile | null {
   return file;
 }
 
+export function listAllOrders(args: {
+  status?: OrderStatus;
+  search?: string;
+  offset: number;
+  limit: number;
+}): { items: Order[]; total: number } {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (args.status) {
+    where.push(`o.status = ?`);
+    params.push(args.status);
+  }
+  if (args.search) {
+    where.push(`(o.order_no LIKE ? OR o.repo_name LIKE ?)`);
+    params.push(`%${args.search}%`, `%${args.search}%`);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const total = (db.prepare(`SELECT COUNT(*) AS c FROM orders o ${whereSql}`).get(...params) as any).c;
+  const rows = db
+    .prepare(`SELECT o.* FROM orders o ${whereSql} ORDER BY o.created_at DESC LIMIT ? OFFSET ?`)
+    .all(...params, args.limit, args.offset) as any[];
+  const items = rows.map((row) => {
+    const buyer = getUserById(row.buyer_id) ?? ({} as User);
+    const seller = getUserById(row.seller_id) ?? ({} as User);
+    return mapOrder(row, buyer, seller);
+  });
+  return { items, total };
+}
+
 // ---------------------------------------------------------------------------
 // Account lifecycle & login history
 // ---------------------------------------------------------------------------
 
-/** Deletes a user and removes all of their uploaded files from disk (DB rows cascade). */
 export function deleteUserWithFiles(userId: string): void {
   const repos = listRepos({ ownerId: userId, limit: 100, offset: 0 }, null).items;
   for (const repo of repos) {
@@ -1091,14 +1978,13 @@ export function deleteUserWithFiles(userId: string): void {
       try {
         fs.unlinkSync(path.join(config.uploadDir, path.basename(file.filePath)));
       } catch {
-        // file already missing — fine
+        // fine
       }
     }
   }
   deleteUser(userId);
 }
 
-/** Returns how many users were permanently deleted. */
 export function deleteUsersDeactivatedBefore(beforeIso: string): number {
   const rows = db
     .prepare(`SELECT id FROM users WHERE deactivated_at IS NOT NULL AND deactivated_at < ?`)
@@ -1170,7 +2056,6 @@ export function listUserLogins(userId: string, limit = 30): LoginLog[] {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Total registered users — used to make the very first registered user an admin. */
 export function getUserCount(): number {
   return (db.prepare(`SELECT COUNT(*) AS c FROM users`).get() as any).c;
 }
@@ -1187,6 +2072,9 @@ export function inferFileType(name: string): FileType {
     )
   )
     return 'code';
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].includes(ext)) return 'audio';
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv'].includes(ext)) return 'video';
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(ext)) return 'archive';
   return 'other';
 }
 

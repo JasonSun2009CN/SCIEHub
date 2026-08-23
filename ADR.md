@@ -56,3 +56,10 @@
 - **Context**: 前后端同语言，需要共享类型（User/Resource/Group 等）与统一构建/启动流程。
 - **Decision**: 单一 git 仓库，npm workspaces 管理 packages/web（前端）+ packages/server（后端）+ packages/shared（共享类型）。
 - **Consequences**: 类型一次定义两处使用；一条命令可并行起前后端；包边界清晰，仍可独立部署。
+
+## ADR-010 商业化模型：内置钱包 + 平台抽成
+- **Status**: Accepted
+- **Context**: 平台从"共享资料"转型为"资源共享/售卖"。需要轻量交易能力，但不想在 MVP 引入第三方支付网关/监管复杂度。
+- **Decision**: 每个 Repository 增加 `pricing_type`（free/paid）、`price`、`currency`；新增 `orders`（含 platform_fee / seller_earning）、`purchases`、`reviews`、`wallet_transactions` 表与 User `wallet_balance`。支付流程：`POST /repos/:id/checkout` 创建待支付订单 → `POST /users/me/orders/:id/pay` 从买家钱包扣款、卖家按"价格 − 10% 平台费"入账、生成 purchase 记录解锁下载。卖家可在订单页主动退款；管理员可退款与给任意用户充值钱包。
+- **Alternatives**: 接入 Stripe/支付宝等真实支付（超出 MVP 范围、需资质）；纯展示不交易（不符合"售卖"诉求）。
+- **Consequences**: 交易闭环完整可演示（钱包/订单/退款/评价/流水）；真实充值与提现走管理员人工通道（`SCIEHUB_ALLOW_SELF_TOPUP=1` 仅为沙盒自充）；平台费率 `PLATFORM_FEE_RATE = 0.10` 集中定义可调；`purchases` 表唯一索引防重复购买。

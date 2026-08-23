@@ -18,8 +18,10 @@ import { registerAdminRoutes } from './routes/admin.js';
 const app = Fastify({ logger: true, trustProxy: true });
 
 await app.register(cors, { origin: true });
+const maxFileBytes = Number(process.env.SCIEHUB_MAX_FILE_MB ?? 200) * 1024 * 1024;
+const maxFilesPerRequest = Number(process.env.SCIEHUB_MAX_FILES ?? 8);
 await app.register(multipart, {
-  limits: { fileSize: 50 * 1024 * 1024, files: 4 },
+  limits: { fileSize: maxFileBytes, files: maxFilesPerRequest },
 });
 
 app.addHook('onRequest', authOnRequest);
@@ -73,7 +75,11 @@ process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
 
 try {
   await app.listen({ port: config.port, host: config.host });
-  app.log.info(`SCIEHub ready — API on http://localhost:${config.port}`);
+  app.log.info(
+    `SCIEHub Marketplace ready — API on http://localhost:${config.port} (max ${Math.round(
+      maxFileBytes / 1024 / 1024,
+    )}MB/file, up to ${maxFilesPerRequest} files per upload)`,
+  );
 } catch (err) {
   app.log.error(err);
   process.exit(1);

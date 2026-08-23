@@ -1,8 +1,8 @@
 # SCIEHub
 
-A GitHub-style study-materials sharing platform for international high school students (IB · AS/A-Level · AP · IGCSE).
+A GitHub-style **study-resource sharing & selling marketplace** for international high school students (IB · AS/A-Level · AP · IGCSE).
 
-**Share, Collaborate, Excel.** Create your own study repositories — each holding multiple files like a GitHub repo — share them into subject groups, compete on the community leaderboard, and download from classmates. Dark-first, GitHub-inspired interface.
+**Share, Buy, Sell, Excel.** Create your own study repositories — each holding multiple files like a GitHub repo — share them into subject groups, list them for **free or at a set price**, earn from every sale via your built-in wallet, and download what you need. Dark-first, GitHub-inspired interface.
 
 ## Tech stack
 
@@ -15,16 +15,29 @@ A GitHub-style study-materials sharing platform for international high school st
 
 ## Features
 
+### Marketplace (buy & sell)
+- **Pricing** — every repository is either **Free** or **Paid**. Sellers set a price (¥/$, max 9,999) and a currency when creating or editing a repository.
+- **Checkout** — `/checkout/:id` shows the full price breakdown (item price, 10% platform fee, seller earnings) and lets buyers **pay instantly from their wallet**.
+- **Wallet** — `/wallet` shows your balance, total income/spending and a full transaction history (purchases, sales, refunds, top-ups). Payouts from sales land in your wallet automatically.
+- **Orders** — `/orders` tracks every purchase (as buyer) and sale (as seller). Buyers can pay pending orders; **sellers can refund** a paid order, which reverses the money for both parties.
+- **Purchases** — paid repositories unlock after payment; the **Purchases** tab on your profile lists everything you own, with instant download.
+- **Reviews** — verified buyers (or owners of free resources) can rate a repository 1–5 stars and write a review. Ratings feed into the average shown on each listing.
+- **Leaderboard** — `/leaderboard` has two views: **Top contributors** (by files shared) and **Top sellers** (by sales + revenue).
+
+### Community & sharing
 - **Repositories** — users create repos (name, description, category, tags) and upload multiple files into them, GitHub-style.
-- **Feed & search** — browse repositories with category filters, sorting (recent / most downloaded / most viewed) and full-text search.
+- **Feed & search** — browse the marketplace with category + pricing filters (free / paid), sorting (recent / downloaded / viewed / sales / rating / price) and full-text search.
 - **Study groups** — join groups by **requesting membership**; the group creator approves or rejects each request. Groups collect repositories shared into them.
 - **Sharing** — a repo owner can share a repository into any group they belong to (and remove it again).
-- **Leaderboard** — `/leaderboard` ranks contributors by number of files shared, showing total size alongside.
 - **Community guidelines** — `/conduct` sets the rules; **Report** buttons on every repository and comment store reports for review.
-- **Admin console** — `/admin` lets admins see site stats, review reports, delete violating repositories/files/comments, and suspend, un-admin or delete users. Admins can add other admins and step down (transfer) their own role.
 - **Account safety** — every sign-in is logged (IP + browser); users can review their login history, **sign out all devices**, **deactivate** their account (deleted after 30 days unless they sign back in) or **permanently delete** it with their password.
 - **Comments & favorites** per repository, per-file download counters, drag-and-drop multi-file uploads with progress.
 - **Dark/light themes** (dark default) driven by CSS-variable tokens.
+
+### Admin
+- **Admin console** — `/admin` shows site stats (including total sales & revenue), recent orders, review reports, delete violating repositories/files/comments, and suspend, un-admin or delete users.
+- **Orders tab** — admins can search all orders, view status, and **refund** paid orders.
+- **Top-up** — admins can add funds to any user's wallet from the Users tab (`/admin` → Users).
 
 ## Getting started (development)
 
@@ -95,24 +108,34 @@ packages/
 
 | Route | Page |
 | --- | --- |
-| `/` | Home — hero, trending repos, top contributors, active groups |
-| `/feed` | Browse/search repositories with filters + sorting |
-| `/repos/:id` | Repository detail — files, comments, favorite, share, report |
-| `/upload` | Create a repository / add files to one you own |
+| `/` | Home — marketplace hero, trending, top sellers, free resources, active groups |
+| `/marketplace` (alias `/feed`) | Browse/search resources with pricing + category filters and sorting |
+| `/repos/:id` | Repository detail — files, price/purchase panel, reviews, comments, share |
+| `/checkout/:id` | Checkout — price breakdown and wallet payment for a paid resource |
+| `/orders` | Your orders — as buyer (pay) and as seller (refund) |
+| `/wallet` | Wallet — balance, income/spending, transaction history |
+| `/upload` | Create a repository / set pricing / add files to one you own |
 | `/groups` | Group directory + create-group dialog |
 | `/groups/:id` | Group detail — repositories / members (+ join requests) / settings (creator) |
-| `/users/:username` | Public profile — repositories / favorites / groups |
-| `/leaderboard` | Top contributors by files shared + total size |
+| `/users/:username` | Public profile — repositories / favorites / purchases / groups |
+| `/leaderboard` | Top contributors and top sellers (sales + revenue) |
 | `/conduct` | Community guidelines |
 | `/contributing` | Contribute — send suggestions, report issues, open PRs |
-| `/admin` | Admin console (admins only) |
+| `/admin` | Admin console (admins only) — overview, orders, reports, users, repos |
 | `/settings` | Profile, avatar, notification prefs, password |
 | `/auth` | Sign in / register |
+
+## User manual
+
+A plain-language guide for buyers and sellers lives in [`docs/USER_MANUAL.md`](./docs/USER_MANUAL.md) — how to price a resource, buy, earn, refund and review.
 
 ## Notes
 
 - Joining a group creates a **join request**; the group creator (admin) approves/rejects it. Admins cannot leave — they delete the group instead.
-- Reports (`reports` table) are stored for future moderation; there is no review UI yet.
+- **Wallet & money** — payments use an internal **wallet balance** (¥ by default). Funds are added by admins via `/admin` → Users → top-up; real payment rails are intentionally out of scope for this MVP. Sellers receive their payout (price minus 10% platform fee) to the wallet automatically when an order is paid.
+- **Refunds** — a seller can refund a paid order from `/orders` (or an admin from `/admin` → Orders); both the buyer's charge and the seller's earning are reversed and the purchase access is removed.
+- **Reviews** — only verified buyers (and owners of free resources) can review. Reviews can be edited or deleted by their author.
+- Reports are triaged in `/admin` → Reports.
 - **Email registered without your permission?** If you find your email is already taken on the sign-up page, use that email to write to `jasonsun2009@yeah.net` — the sign-up form includes a ready-made "claim" email link. Never create an account on an email you don't own. Forgot your password? The sign-in form has a "contact the admin to reset it" link to the same address.
 - **Admins** can open `/admin` from their account menu. The **first registered user** on a fresh install becomes the site admin — no default password exists anywhere in the code. Backups: emails in `ADMIN_EMAILS` are auto-promoted on register/login, and the `promote-admin` script grants admin to any existing user. Admins can **add other admins** (Users tab) and **step down** (transfer) their own admin role — the last admin is protected from being removed. Tip: register your owner account first so no stranger grabs admin on a public server.
 - **Account security** — every login attempt is recorded and shown on `/settings` (login history). "Sign out all devices" invalidates every session. Deactivating an account freezes it for 30 days; signing in again restores it, otherwise it is deleted. Accounts can also be permanently deleted with their password.

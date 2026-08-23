@@ -1,8 +1,29 @@
 import { useCallback, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FaCheck, FaCloudUploadAlt, FaFile, FaPlus, FaSpinner, FaTimes } from 'react-icons/fa';
-import { CATEGORIES, type Group, type RepoFile, type Repository } from '@sciehub/shared';
+import {
+  FaCheck,
+  FaCloudUploadAlt,
+  FaCoins,
+  FaDollarSign,
+  FaEye,
+  FaFile,
+  FaPlus,
+  FaSpinner,
+  FaTimes,
+} from 'react-icons/fa';
+import {
+  CATEGORIES,
+  CURRENCIES,
+  MAX_FILE_PRICE,
+  PLATFORM_FEE_RATE,
+  formatPrice,
+  type Currency,
+  type Group,
+  type PricingType,
+  type RepoFile,
+  type Repository,
+} from '@sciehub/shared';
 import { api, uploadFiles } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
@@ -42,6 +63,11 @@ export function UploadPage() {
   const [categoryId, setCategoryId] = useState('');
   const [tags, setTags] = useState('');
   const [shareGroupIds, setShareGroupIds] = useState<string[]>([]);
+  const [pricingType, setPricingType] = useState<PricingType>('free');
+  const [price, setPrice] = useState<string>('9.9');
+  const [currency, setCurrency] = useState<Currency>('CNY');
+  const [previewImageUrl, setPreviewImageUrl] = useState('');
+  const [markPreview, setMarkPreview] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -93,6 +119,13 @@ export function UploadPage() {
       toast(isNewRepo && !name.trim() ? 'Repository name is required' : 'Choose a category', 'error');
       return;
     }
+    if (pricingType === 'paid') {
+      const n = Number(price);
+      if (!Number.isFinite(n) || n <= 0 || n > MAX_FILE_PRICE) {
+        toast(`Price must be between 0 and ${MAX_FILE_PRICE}`, 'error');
+        return;
+      }
+    }
 
     setBusy(true);
     try {
@@ -100,7 +133,16 @@ export function UploadPage() {
       if (isNewRepo) {
         const created = await api<{ repo: Repository }>('/repos', {
           method: 'POST',
-          json: { name: name.trim(), description: description.trim(), categoryId, tags },
+          json: {
+            name: name.trim(),
+            description: description.trim(),
+            categoryId,
+            tags,
+            pricingType,
+            price: pricingType === 'paid' ? Number(price) : 0,
+            currency,
+            previewImageUrl: previewImageUrl.trim() || undefined,
+          },
         });
         repoId = created.repo.id;
         for (const gid of shareGroupIds) {
@@ -114,6 +156,7 @@ export function UploadPage() {
         const form = new FormData();
         form.append('description', description.trim());
         form.append('file', queued.file, queued.file.name);
+        if (markPreview) form.append('isPreview', '1');
         try {
           const result = await uploadFiles(`/api/repos/${repoId}/files`, form, (percent) => {
             setFiles((prev) => prev.map((f) => (f.id === queued.id ? { ...f, progress: percent } : f)));

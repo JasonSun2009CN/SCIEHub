@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FaBan, FaCheck, FaSearch, FaShieldAlt, FaTrash } from 'react-icons/fa';
+import { FaBan, FaCheck, FaCoins, FaSearch, FaShieldAlt, FaTrash } from 'react-icons/fa';
 import { formatBytes, type User } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { UserAvatar } from '@/components/generated/UserAvatar';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useToast } from '@/components/common/Toast';
 import { useAuth } from '@/context/AuthContext';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatNumber } from '@/lib/utils';
 
 const PAGE = 20;
 
@@ -75,6 +75,27 @@ export function UsersTab() {
     onError: (err) => toast(err instanceof Error ? err.message : 'Delete failed', 'error'),
   });
 
+  const topupMutation = useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+      api(`/admin/users/${id}/topup`, { method: 'POST', json: { amount, currency: 'CNY' } }),
+    onSuccess: () => {
+      refresh();
+      toast('Wallet topped up', 'success');
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Top-up failed', 'error'),
+  });
+
+  const onTopup = (u: User) => {
+    const raw = window.prompt(`Enter top-up amount (¥) for @${u.username}:`, '10');
+    if (raw === null) return;
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
+      toast('Amount must be a positive number ≤ 1,000,000', 'error');
+      return;
+    }
+    topupMutation.mutate({ id: u.id, amount });
+  };
+
   const total = data?.total ?? 0;
   const hasMore = items.length < total;
 
@@ -116,7 +137,11 @@ export function UsersTab() {
                   </Link>
                   <span className="text-xs text-muted-foreground"> @{u.username} · {u.email}</span>
                   <div className="mt-0.5 text-xs text-muted-foreground">
-                    {u.repoCount} repos · {u.fileCount} files · {formatBytes(u.totalBytes)} · joined {formatDate(u.createdAt)}
+                    {u.repoCount} repos · {u.fileCount} files · {formatBytes(u.totalBytes)} · joined {formatDate(u.createdAt)} ·{' '}
+                    wallet{' '}
+                    <span className="font-semibold text-accent tabular-nums">
+                      ¥{formatNumber(u.walletBalance)}
+                    </span>
                   </div>
                 </div>
                 {u.isAdmin && <Badge variant="warning">Admin</Badge>}
@@ -154,6 +179,11 @@ export function UsersTab() {
                       ) : (
                         <FaBan className="h-3.5 w-3.5 text-warning" />
                       )}
+                    </Button>
+                  )}
+                  {me?.id !== u.id && (
+                    <Button size="sm" variant="ghost" onClick={() => onTopup(u)} title="Top up wallet">
+                      <FaCoins className="h-3.5 w-3.5 text-accent" />
                     </Button>
                   )}
                   {me?.id !== u.id && (
