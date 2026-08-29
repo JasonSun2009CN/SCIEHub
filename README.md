@@ -50,6 +50,9 @@ Open http://localhost:5173.
 
 ## Deploying to a server
 
+A short version lives below. For the full guide — Nginx/systemd/PM2, backups,
+upgrades, hardening — see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+
 Requirements: **Node.js 18+** (tested on 22) and **npm**. No database service is needed — SQLite is a single file.
 
 On a fresh server, from a clean clone:
