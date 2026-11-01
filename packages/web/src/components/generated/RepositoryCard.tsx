@@ -9,6 +9,7 @@ import {
   FaHeart,
   FaStar,
   FaTag,
+  FaUserSecret,
 } from 'react-icons/fa';
 import { classificationLabel, formatBytes, formatPrice, type Repository } from '@sciehub/shared';
 import { Badge } from '@/components/ui/badge';
@@ -24,14 +25,14 @@ interface RepositoryCardProps {
 function PriceBadge({ repo }: { repo: Repository }) {
   if (repo.pricingType === 'free') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">
+      <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success-subtle px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-success">
         <FaTag className="h-2.5 w-2.5" />
-        FREE
+        Free
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[11px] font-bold text-accent">
+    <span className="inline-flex items-center gap-1 rounded-full border border-warning/35 bg-warning-subtle px-2.5 py-1 text-[11px] font-bold tabular-nums text-warning">
       <FaTag className="h-2.5 w-2.5" />
       {formatPrice(repo.price, repo.currency)}
     </span>
@@ -52,82 +53,93 @@ function RatingRow({ repo }: { repo: Repository }) {
 
 export function RepositoryCard({ repo, index = 0, showGroups = true }: RepositoryCardProps) {
   return (
-    <div
+    <article
       className={cn(
-        'card-hover group relative animate-fade-in-up flex flex-col rounded-lg border border-border bg-surface p-5 hover:border-accent',
+        'card-hover group relative flex animate-fade-in-up flex-col rounded-2xl border border-border/75 bg-surface/75 p-5 shadow-soft',
       )}
       style={{ animationDelay: `${index * 60}ms` }}
     >
-      {/* Purchased check mark */}
       {repo.isPurchased && (
         <span
-          className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-success/40 bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success shadow-sm"
+          className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-success/40 bg-success-subtle px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success shadow-sm"
           title="You already own this resource"
         >
           <FaCheck className="h-2.5 w-2.5" />
-          Purchased
+          Owned
         </span>
       )}
 
-      {/* Preview image banner */}
       {repo.previewImageUrl && (
         <Link
           to={`/repos/${repo.id}`}
-          className="mb-4 -mx-2 -mt-2 block aspect-[16/7] overflow-hidden rounded-md bg-surface-2"
+          className="mb-4 -mx-1 -mt-1 block aspect-[16/7] overflow-hidden rounded-xl bg-surface-2"
           aria-hidden
         >
           <img
             src={repo.previewImageUrl}
             alt=""
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
           />
         </Link>
       )}
 
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent-subtle text-accent">
+        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-subtle text-accent transition-colors group-hover:bg-accent group-hover:text-accent-foreground">
           <FaFolder className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-start justify-between gap-2">
             <Link to={`/repos/${repo.id}`} className="min-w-0 flex-1">
-              <h3 className="line-clamp-1 font-semibold transition-colors group-hover:text-accent">
+              <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight transition-colors group-hover:text-accent">
                 {repo.name}
               </h3>
             </Link>
-            <PriceBadge repo={repo} />
+            {!repo.isPurchased && <PriceBadge repo={repo} />}
           </div>
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+          <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-muted-foreground">
             {repo.description || 'No description provided.'}
           </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <Badge variant="outline">{repo.levelName}</Badge>
-            <Badge variant="secondary">{repo.resourceTypeName}</Badge>
-          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <Link to={`/users/${repo.owner.username}`} className="font-medium hover:text-accent">
-          {repo.owner.nickname}
-        </Link>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <Badge variant="outline">{repo.levelName}</Badge>
+        <Badge variant="secondary">{repo.resourceTypeName}</Badge>
+        {repo.tags.slice(0, 2).map((tag) => (
+          <Badge key={tag} variant="secondary">
+            #{tag}
+          </Badge>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        {repo.isAnonymous ? (
+          <span className="inline-flex items-center gap-1 font-medium">
+            <FaUserSecret className="h-3 w-3 text-accent" /> Anonymous
+          </span>
+        ) : (
+          <Link to={`/users/${repo.owner.username}`} className="font-medium hover:text-accent">
+            {repo.owner.nickname}
+          </Link>
+        )}
         {showGroups &&
-          repo.groupNames.slice(0, 2).map((g) => (
-            <span key={g} className="rounded-full bg-surface-2 px-2 py-0.5">
-              {g}
+          repo.groupNames.slice(0, 1).map((group) => (
+            <span key={group} className="rounded-full bg-surface-2 px-2 py-0.5">
+              {group}
             </span>
           ))}
         <RatingRow repo={repo} />
-        {(repo.totalSales ?? 0) > 0 && (
-          <span className="ml-auto text-[11px] font-semibold text-accent/90">
+        {(repo.totalSales ?? 0) > 0 ? (
+          <span className="ml-auto text-[11px] font-semibold text-warning">
             {repo.totalSales} sold
           </span>
+        ) : (
+          <span className="ml-auto">{timeAgo(repo.createdAt)}</span>
         )}
-        {!repo.totalSales && <span className="ml-auto">{timeAgo(repo.createdAt)}</span>}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-xs text-muted-foreground">
         <span title="Files" className="flex items-center gap-1">
           <FaBook className="h-3 w-3" /> {repo.fileCount}
         </span>
@@ -146,27 +158,19 @@ export function RepositoryCard({ repo, index = 0, showGroups = true }: Repositor
         </span>
       </div>
 
-      {repo.tags.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {repo.tags.slice(0, 3).map((tag) => (
-            <Badge key={tag} variant="secondary">
-              #{tag}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+      <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-3">
         <UserAvatar
           nickname={repo.owner.nickname}
           username={repo.owner.username}
           avatarUrl={repo.owner.avatarUrl}
           size="sm"
         />
-        <span className="text-xs text-muted-foreground">
-          {repo.owner.nickname} · {classificationLabel(repo.levelId, repo.categoryId, repo.resourceType)}
+        <span className="truncate text-xs text-muted-foreground">
+          {repo.isAnonymous
+            ? `Anonymous · ${classificationLabel(repo.levelId, repo.categoryId, repo.resourceType)}`
+            : classificationLabel(repo.levelId, repo.categoryId, repo.resourceType)}
         </span>
       </div>
-    </div>
+    </article>
   );
 }

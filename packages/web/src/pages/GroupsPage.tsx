@@ -30,7 +30,7 @@ function GroupsSkeleton() {
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="space-y-3 rounded-lg border border-border bg-surface p-5">
+        <div key={i} className="space-y-3 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5">
           <div className="flex gap-3">
             <Skeleton className="h-10 w-10" />
             <div className="flex-1 space-y-2">
@@ -141,7 +141,7 @@ export function GroupsPage() {
       <PageMeta title="Groups" description="Browse study groups on SCIEHub." />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <h1 className="flex items-center gap-2 font-display text-3xl">
             <FaUsers className="h-6 w-6 text-accent" /> Study groups
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">Join a subject community or start your own.</p>
@@ -238,7 +238,7 @@ export function GroupsPage() {
         {isLoading && offset === 0 ? (
           <GroupsSkeleton />
         ) : items.length === 0 ? (
-          <div className="rounded-lg border border-border bg-surface py-16 text-center">
+          <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft py-16 text-center">
             <FaUsers className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-3 font-medium">No groups found</p>
             <p className="mt-1 text-sm text-muted-foreground">Try a different search or be the first to start one.</p>

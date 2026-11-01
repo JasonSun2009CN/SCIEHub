@@ -11,6 +11,8 @@ import { registerGroupRoutes } from './routes/groups.js';
 import { registerUserRoutes } from './routes/users.js';
 import { registerHomeRoutes } from './routes/home.js';
 import { registerReportRoutes } from './routes/reports.js';
+import { registerCommunityRoutes } from './routes/community.js';
+import { registerRequestRoutes } from './routes/requests.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import type { AppEnv } from './types.js';
 
@@ -34,6 +36,8 @@ registerGroupRoutes(app);
 registerUserRoutes(app);
 registerHomeRoutes(app);
 registerReportRoutes(app);
+registerCommunityRoutes(app);
+registerRequestRoutes(app);
 registerAdminRoutes(app);
 
 // Uploaded files are stored in R2 and served from /uploads/<key>.

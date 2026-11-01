@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FaFolder, FaSearch, FaTrash } from 'react-icons/fa';
+import { FaFolder, FaSearch, FaTrash, FaUserSecret } from 'react-icons/fa';
 import { formatBytes, type Repository } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ export function ReposTab() {
         />
       </form>
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-border/75 bg-surface/75 shadow-soft">
         {isLoading && offset === 0 ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -94,9 +94,15 @@ export function ReposTab() {
                 <Badge variant="outline">{repo.levelName}</Badge>
                 <Badge variant="secondary">{repo.categoryName}</Badge>
                 <Badge variant="outline">{repo.resourceTypeName}</Badge>
-                <Link to={`/users/${repo.owner.username}`} className="text-xs text-muted-foreground hover:text-accent">
-                  @{repo.owner.username}
-                </Link>
+                {repo.isAnonymous ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <FaUserSecret className="h-3 w-3 text-accent" /> Anonymous
+                  </span>
+                ) : (
+                  <Link to={`/users/${repo.owner.username}`} className="text-xs text-muted-foreground hover:text-accent">
+                    @{repo.owner.username}
+                  </Link>
+                )}
                 <span className="text-xs text-muted-foreground">
                   {repo.fileCount} files · {formatBytes(repo.totalBytes)} · {formatNumber(repo.downloadCount)} downloads · {timeAgo(repo.createdAt)}
                 </span>

@@ -13,9 +13,8 @@ import { AdminPage } from './pages/AdminPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { ConductPage } from './pages/ConductPage';
 import { ContributingPage } from './pages/ContributingPage';
-import { OrdersPage } from './pages/OrdersPage';
-import { WalletPage } from './pages/WalletPage';
-import { CheckoutPage } from './pages/CheckoutPage';
+import { CommunityPage } from './pages/CommunityPage';
+import { RequestsPage } from './pages/RequestsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -28,10 +27,9 @@ export function AppRoutes() {
         <Route path="/free" element={<FeedPage zone="free" />} />
         <Route path="/paid" element={<FeedPage zone="paid" />} />
         <Route path="/repos/:id" element={<RepoDetailPage />} />
-        <Route path="/checkout/:repoId" element={<CheckoutPage />} />
         <Route path="/upload" element={<UploadPage />} />
-        <Route path="/orders" element={<OrdersPage />} />
-        <Route path="/wallet" element={<WalletPage />} />
+        <Route path="/community" element={<CommunityPage />} />
+        <Route path="/requests" element={<RequestsPage />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/groups/:id" element={<GroupDetailPage />} />
         <Route path="/users/:username" element={<UserProfilePage />} />

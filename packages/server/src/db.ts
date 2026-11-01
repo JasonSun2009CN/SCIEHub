@@ -1,6 +1,7 @@
 import type {
   AdminReportItem,
   Comment,
+  CommunityPost,
   Currency,
   EducationLevel,
   FileType,
@@ -13,6 +14,8 @@ import type {
   Order,
   OrderStatus,
   PurchaseRecord,
+  PurchaseRequest,
+  PurchaseRequestStatus,
   RepoFile,
   Report,
   ReportTarget,
@@ -108,6 +111,10 @@ function mapUser(row: any): User {
     totalPurchases: Number(row.total_purchases ?? 0),
     isAdmin: Boolean(row.is_admin),
     isSuspended: Boolean(row.is_suspended),
+    canBuy: row.can_buy === undefined ? true : Boolean(row.can_buy),
+    canPublishFree: row.can_publish_free === undefined ? true : Boolean(row.can_publish_free),
+    canPublishPaid: row.can_publish_paid === undefined ? true : Boolean(row.can_publish_paid),
+    canChat: row.can_chat === undefined ? true : Boolean(row.can_chat),
   };
 }
 
@@ -136,28 +143,50 @@ FROM repos p
 JOIN users u ON u.id = p.owner_id
 `;
 
+function anonymousUser(id: string): User {
+  return {
+    id,
+    username: '',
+    nickname: 'Anonymous',
+    avatarUrl: '',
+    bio: '',
+    createdAt: '',
+    repoCount: 0,
+    fileCount: 0,
+    groupCount: 0,
+    totalDownloads: 0,
+    totalBytes: 0,
+    walletBalance: 0,
+    totalSales: 0,
+    totalPurchases: 0,
+  };
+}
+
 function mapRepo(row: any, favoriteIds: Set<string>, purchasedIds: Set<string>): Repository {
+  const isAnonymous = Boolean(row.is_anonymous);
   return {
     id: row.id,
     name: row.name,
     description: row.description ?? '',
     ownerId: row.owner_id,
-    owner: {
-      id: row.owner_id,
-      username: row.owner_username,
-      nickname: row.owner_nickname,
-      avatarUrl: row.owner_avatar,
-      bio: row.owner_bio,
-      createdAt: row.owner_created_at,
-      repoCount: row.owner_repo_count,
-      fileCount: row.owner_file_count,
-      groupCount: row.owner_group_count,
-      totalDownloads: row.owner_total_downloads,
-      totalBytes: row.owner_total_bytes,
-      walletBalance: Number(row.owner_wallet_balance ?? 0),
-      totalSales: Number(row.owner_total_sales ?? 0),
-      totalPurchases: Number(row.owner_total_purchases ?? 0),
-    },
+    owner: isAnonymous
+      ? anonymousUser(row.owner_id)
+      : {
+          id: row.owner_id,
+          username: row.owner_username,
+          nickname: row.owner_nickname,
+          avatarUrl: row.owner_avatar,
+          bio: row.owner_bio,
+          createdAt: row.owner_created_at,
+          repoCount: row.owner_repo_count,
+          fileCount: row.owner_file_count,
+          groupCount: row.owner_group_count,
+          totalDownloads: row.owner_total_downloads,
+          totalBytes: row.owner_total_bytes,
+          walletBalance: Number(row.owner_wallet_balance ?? 0),
+          totalSales: Number(row.owner_total_sales ?? 0),
+          totalPurchases: Number(row.owner_total_purchases ?? 0),
+        },
     categoryId: row.category_id,
     categoryName: categoryName(row.category_id),
     levelId: (row.level_id ?? 'other') as EducationLevel,
@@ -184,6 +213,7 @@ function mapRepo(row: any, favoriteIds: Set<string>, purchasedIds: Set<string>):
     isFavorite: favoriteIds.has(row.id),
     isOwner: false,
     isPurchased: purchasedIds.has(row.id),
+    isAnonymous,
     previewImageUrl: row.preview_image ?? undefined,
   };
 }
@@ -525,12 +555,13 @@ export async function createRepo(input: {
   pricingType: 'free' | 'paid';
   price: number;
   currency: Currency;
+  isAnonymous?: boolean;
   previewImageUrl?: string;
 }): Promise<Repository> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  await run(`INSERT INTO repos (id, name, description, owner_id, category_id, level_id, resource_type, tags, created_at, pricing_type, price, currency, total_sales, total_revenue, preview_image)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`, id, input.name, input.description, input.ownerId, input.categoryId, input.levelId, input.resourceType, JSON.stringify(input.tags), now, input.pricingType, input.price, input.currency, input.previewImageUrl ?? null);
+  await run(`INSERT INTO repos (id, name, description, owner_id, category_id, level_id, resource_type, tags, created_at, pricing_type, price, currency, total_sales, total_revenue, is_anonymous, preview_image)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`, id, input.name, input.description, input.ownerId, input.categoryId, input.levelId, input.resourceType, JSON.stringify(input.tags), now, input.pricingType, input.price, input.currency, input.isAnonymous ? 1 : 0, input.previewImageUrl ?? null);
   return (await getRepoById(id, input.ownerId, false))!;
 }
 
@@ -546,6 +577,7 @@ export async function updateRepo(
     pricingType?: 'free' | 'paid';
     price?: number;
     currency?: Currency;
+    isAnonymous?: boolean;
     previewImageUrl?: string | null;
   },
 ): Promise<Repository | null> {
@@ -559,8 +591,9 @@ export async function updateRepo(
        pricing_type = COALESCE(?, pricing_type),
        price = COALESCE(?, price),
        currency = COALESCE(?, currency),
+       is_anonymous = COALESCE(?, is_anonymous),
        preview_image = COALESCE(?, preview_image)
-     WHERE id = ?`, patch.name ?? null, patch.description ?? null, patch.categoryId ?? null, patch.levelId ?? null, patch.resourceType ?? null, patch.tags ? JSON.stringify(patch.tags) : null, patch.pricingType ?? null, patch.price ?? null, patch.currency ?? null, patch.previewImageUrl === undefined ? null : patch.previewImageUrl, id);
+     WHERE id = ?`, patch.name ?? null, patch.description ?? null, patch.categoryId ?? null, patch.levelId ?? null, patch.resourceType ?? null, patch.tags ? JSON.stringify(patch.tags) : null, patch.pricingType ?? null, patch.price ?? null, patch.currency ?? null, patch.isAnonymous === undefined ? null : patch.isAnonymous ? 1 : 0, patch.previewImageUrl === undefined ? null : patch.previewImageUrl, id);
   return await getRepoById(id, null, false);
 }
 
@@ -1024,6 +1057,227 @@ export async function refundOrder(orderId: string, adminId: string, reason = '')
 }
 
 // ---------------------------------------------------------------------------
+// Contact-based purchase requests
+// ---------------------------------------------------------------------------
+
+async function mapPurchaseRequest(
+  row: any,
+  includeBuyerEmail: boolean,
+): Promise<PurchaseRequest | null> {
+  const repo = await getRepoById(row.repo_id, null, false);
+  if (!repo) return null;
+  const buyer = (await getUserById(row.buyer_id)) ?? ({} as User);
+  const seller = (await getUserById(row.seller_id)) ?? ({} as User);
+  return {
+    id: row.id,
+    repoId: row.repo_id,
+    repo,
+    buyerId: row.buyer_id,
+    buyer,
+    sellerId: row.seller_id,
+    seller,
+    buyerEmail: includeBuyerEmail ? row.buyer_email : undefined,
+    message: row.message ?? '',
+    status: row.status as PurchaseRequestStatus,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function hasCompletedPurchaseRequest(repoId: string, buyerId: string): Promise<boolean> {
+  return Boolean(
+    await one(
+      `SELECT 1 FROM purchase_requests WHERE repo_id = ? AND buyer_id = ? AND status = 'completed'`,
+      repoId,
+      buyerId,
+    ),
+  );
+}
+
+export async function hasPendingPurchaseRequest(repoId: string, buyerId: string): Promise<boolean> {
+  return Boolean(
+    await one(
+      `SELECT 1 FROM purchase_requests WHERE repo_id = ? AND buyer_id = ? AND status IN ('pending', 'contacted')`,
+      repoId,
+      buyerId,
+    ),
+  );
+}
+
+export async function getPurchaseRequestForBuyer(
+  repoId: string,
+  buyerId: string,
+): Promise<PurchaseRequest | null> {
+  const row = await one(
+    `SELECT * FROM purchase_requests WHERE repo_id = ? AND buyer_id = ? AND status IN ('pending', 'contacted', 'completed') ORDER BY created_at DESC LIMIT 1`,
+    repoId,
+    buyerId,
+  );
+  return row ? mapPurchaseRequest(row, false) : null;
+}
+
+export async function createPurchaseRequest(input: {
+  repoId: string;
+  buyerId: string;
+  sellerId: string;
+  buyerEmail: string;
+  message: string;
+}): Promise<PurchaseRequest> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await run(
+    `INSERT INTO purchase_requests (id, repo_id, buyer_id, seller_id, buyer_email, message, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    id,
+    input.repoId,
+    input.buyerId,
+    input.sellerId,
+    input.buyerEmail,
+    input.message,
+    now,
+    now,
+  );
+  return (await mapPurchaseRequest(
+    await one(`SELECT * FROM purchase_requests WHERE id = ?`, id),
+    true,
+  ))!;
+}
+
+export async function getPurchaseRequestById(
+  id: string,
+  includeBuyerEmail = false,
+): Promise<PurchaseRequest | null> {
+  const row = await one(`SELECT * FROM purchase_requests WHERE id = ?`, id);
+  return row ? mapPurchaseRequest(row, includeBuyerEmail) : null;
+}
+
+export async function listPurchaseRequests(userId: string): Promise<{
+  incoming: PurchaseRequest[];
+  outgoing: PurchaseRequest[];
+}> {
+  const incomingRows = await all(
+    `SELECT * FROM purchase_requests WHERE seller_id = ? ORDER BY created_at DESC LIMIT 100`,
+    userId,
+  );
+  const outgoingRows = await all(
+    `SELECT * FROM purchase_requests WHERE buyer_id = ? ORDER BY created_at DESC LIMIT 100`,
+    userId,
+  );
+  const incoming: PurchaseRequest[] = [];
+  for (const row of incomingRows) {
+    const item = await mapPurchaseRequest(row, true);
+    if (item) incoming.push(item);
+  }
+  const outgoing: PurchaseRequest[] = [];
+  for (const row of outgoingRows) {
+    const item = await mapPurchaseRequest(row, false);
+    if (item) outgoing.push(item);
+  }
+  return { incoming, outgoing };
+}
+
+export async function updatePurchaseRequestStatus(
+  id: string,
+  status: PurchaseRequestStatus,
+): Promise<void> {
+  await run(
+    `UPDATE purchase_requests SET status = ?, updated_at = ? WHERE id = ?`,
+    status,
+    new Date().toISOString(),
+    id,
+  );
+}
+
+export async function countPendingPurchaseRequests(sellerId: string): Promise<number> {
+  return Number(
+    (await one(
+      `SELECT COUNT(*) AS c FROM purchase_requests WHERE seller_id = ? AND status = 'pending'`,
+      sellerId,
+    ) as any).c,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Community board
+// ---------------------------------------------------------------------------
+
+const COMMUNITY_SELECT = `
+SELECT cp.*,
+  u.username AS username, u.nickname AS nickname, u.avatar_url AS avatar_url,
+  u.bio AS bio, u.created_at AS user_created_at,
+  (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
+  (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
+  (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
+  (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
+  (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+  u.wallet_balance AS wallet_balance,
+  u.total_sales AS total_sales,
+  u.total_purchases AS total_purchases
+FROM community_posts cp
+JOIN users u ON u.id = cp.user_id
+`;
+
+function mapCommunityPost(row: any, currentUserId: string | null): CommunityPost {
+  const isAnonymous = Boolean(row.is_anonymous);
+  const author = isAnonymous
+    ? anonymousUser(row.user_id)
+    : {
+        ...mapUser(row),
+        createdAt: row.user_created_at,
+      };
+  return {
+    id: row.id,
+    userId: row.user_id,
+    author,
+    content: row.content,
+    isAnonymous,
+    createdAt: row.created_at,
+    isOwn: currentUserId === row.user_id,
+  };
+}
+
+export async function listCommunityPosts(
+  limit = 80,
+  currentUserId: string | null = null,
+): Promise<CommunityPost[]> {
+  const rows = await all(
+    `${COMMUNITY_SELECT} ORDER BY cp.created_at DESC LIMIT ?`,
+    Math.min(Math.max(limit, 1), 200),
+  ) as any[];
+  return rows.reverse().map((row) => mapCommunityPost(row, currentUserId));
+}
+
+export async function getCommunityPostById(
+  id: string,
+  currentUserId: string | null = null,
+): Promise<CommunityPost | null> {
+  const row = await one(`${COMMUNITY_SELECT} WHERE cp.id = ?`, id) as any;
+  return row ? mapCommunityPost(row, currentUserId) : null;
+}
+
+export async function createCommunityPost(input: {
+  userId: string;
+  content: string;
+  isAnonymous: boolean;
+}): Promise<CommunityPost> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await run(
+    `INSERT INTO community_posts (id, user_id, content, is_anonymous, created_at) VALUES (?, ?, ?, ?, ?)`,
+    id,
+    input.userId,
+    input.content,
+    input.isAnonymous ? 1 : 0,
+    now,
+  );
+  return (await getCommunityPostById(id, input.userId))!;
+}
+
+export async function deleteCommunityPost(id: string): Promise<void> {
+  await run(`DELETE FROM community_posts WHERE id = ?`, id);
+}
+
+// ---------------------------------------------------------------------------
 // Comments / Reviews
 // ---------------------------------------------------------------------------
 
@@ -1084,9 +1338,10 @@ export async function listRepoReviews(repoId: string): Promise<Review[]> {
 }
 
 export async function canUserReviewRepo(userId: string, repoId: string): Promise<boolean> {
-  // Must have purchased, and not already reviewed
+  // A legacy purchase or a completed contact request unlocks reviews.
   const purchased = await hasUserPurchasedRepo(userId, repoId);
-  if (!purchased) {
+  const completedRequest = await hasCompletedPurchaseRequest(repoId, userId);
+  if (!purchased && !completedRequest) {
     // Owner or free resource also allowed? Owner always. Free: allow everyone.
     const repo = await getRepoById(repoId, null);
     if (!repo) return false;
@@ -1551,6 +1806,27 @@ export async function setUserAdmin(userId: string, isAdmin: boolean): Promise<vo
 
 export async function setUserSuspended(userId: string, suspended: boolean): Promise<void> {
   await run(`UPDATE users SET is_suspended = ? WHERE id = ?`, suspended ? 1 : 0, userId);
+}
+
+export async function setUserCanBuy(userId: string, allowed: boolean): Promise<void> {
+  await run(`UPDATE users SET can_buy = ? WHERE id = ?`, allowed ? 1 : 0, userId);
+}
+
+export async function setUserCanPublishFree(userId: string, allowed: boolean): Promise<void> {
+  await run(`UPDATE users SET can_publish_free = ? WHERE id = ?`, allowed ? 1 : 0, userId);
+}
+
+export async function setUserCanPublishPaid(userId: string, allowed: boolean): Promise<void> {
+  await run(`UPDATE users SET can_publish_paid = ? WHERE id = ?`, allowed ? 1 : 0, userId);
+}
+
+export async function setUserCanChat(userId: string, allowed: boolean): Promise<void> {
+  await run(`UPDATE users SET can_chat = ? WHERE id = ?`, allowed ? 1 : 0, userId);
+}
+
+export async function getUserEmail(userId: string): Promise<string | null> {
+  const row = await one(`SELECT email FROM users WHERE id = ?`, userId) as any;
+  return row?.email ?? null;
 }
 
 export async function deleteUser(userId: string): Promise<void> {

@@ -1,7 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FaBan, FaCheck, FaCoins, FaSearch, FaShieldAlt, FaTrash } from 'react-icons/fa';
+import {
+  FaBan,
+  FaCheck,
+  FaCloudUploadAlt,
+  FaCoins,
+  FaComments,
+  FaSearch,
+  FaShieldAlt,
+  FaShoppingCart,
+  FaTrash,
+  FaUserShield,
+} from 'react-icons/fa';
 import { formatBytes, type User } from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -11,10 +22,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { UserAvatar } from '@/components/generated/UserAvatar';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useToast } from '@/components/common/Toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/context/AuthContext';
-import { formatDate, formatNumber } from '@/lib/utils';
+import { cn, formatDate, formatNumber } from '@/lib/utils';
 
 const PAGE = 20;
+
+type PermissionKey = 'canBuy' | 'canPublishFree' | 'canPublishPaid' | 'canChat';
+
+const PERMISSIONS: { key: PermissionKey; label: string; Icon: typeof FaComments }[] = [
+  { key: 'canBuy', label: 'Request paid resources', Icon: FaShoppingCart },
+  { key: 'canPublishFree', label: 'Publish free content', Icon: FaCloudUploadAlt },
+  { key: 'canPublishPaid', label: 'Publish paid content', Icon: FaCoins },
+  { key: 'canChat', label: 'Post in community', Icon: FaComments },
+];
 
 export function UsersTab() {
   const { user: me, refresh: refreshAuth } = useAuth();
@@ -45,8 +73,20 @@ export function UsersTab() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
 
   const patchMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { isAdmin?: boolean; isSuspended?: boolean } }) =>
-      api(`/admin/users/${id}`, { method: 'PATCH', json: patch }),
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: {
+        isAdmin?: boolean;
+        isSuspended?: boolean;
+        canBuy?: boolean;
+        canPublishFree?: boolean;
+        canPublishPaid?: boolean;
+        canChat?: boolean;
+      };
+    }) => api(`/admin/users/${id}`, { method: 'PATCH', json: patch }),
     onSuccess: () => {
       refresh();
       toast('User updated', 'success');
@@ -117,7 +157,7 @@ export function UsersTab() {
         />
       </form>
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-border/75 bg-surface/75 shadow-soft">
         {isLoading && offset === 0 ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -146,6 +186,14 @@ export function UsersTab() {
                 </div>
                 {u.isAdmin && <Badge variant="warning">Admin</Badge>}
                 {u.isSuspended && <Badge variant="error">Banned</Badge>}
+                {!u.isSuspended && (
+                  <div className="flex flex-wrap gap-1">
+                    {u.canBuy === false && <Badge variant="error">Buy off</Badge>}
+                    {u.canPublishFree === false && <Badge variant="error">Free off</Badge>}
+                    {u.canPublishPaid === false && <Badge variant="error">Paid off</Badge>}
+                    {u.canChat === false && <Badge variant="error">Chat off</Badge>}
+                  </div>
+                )}
                 <div className="flex items-center gap-1">
                   {me?.id === u.id && u.isAdmin ? (
                     <Button
@@ -167,12 +215,47 @@ export function UsersTab() {
                       <FaShieldAlt className={u.isAdmin ? 'h-3.5 w-3.5 text-warning' : 'h-3.5 w-3.5'} />
                     </Button>
                   ) : null}
+                  {me?.id !== u.id && !u.isSuspended && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="ghost" title="Granular permissions">
+                          <FaUserShield className="h-3.5 w-3.5 text-accent" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64">
+                        <DropdownMenuLabel>Permissions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {PERMISSIONS.map(({ key, label, Icon }) => {
+                          const enabled = u[key] !== false;
+                          return (
+                            <DropdownMenuItem
+                              key={key}
+                              onClick={() =>
+                                patchMutation.mutate({ id: u.id, patch: { [key]: !enabled } })
+                              }
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              <span className="flex-1">{label}</span>
+                              <span
+                                className={cn(
+                                  'text-[10px] font-bold uppercase tracking-wide',
+                                  enabled ? 'text-success' : 'text-error',
+                                )}
+                              >
+                                {enabled ? 'On' : 'Off'}
+                              </span>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                   {me?.id !== u.id && (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => patchMutation.mutate({ id: u.id, patch: { isSuspended: !u.isSuspended } })}
-                      title={u.isSuspended ? 'Unban account' : 'Ban account'}
+                      title={u.isSuspended ? 'Unban account' : 'Ban all features'}
                     >
                       {u.isSuspended ? (
                         <FaCheck className="h-3.5 w-3.5 text-success" />

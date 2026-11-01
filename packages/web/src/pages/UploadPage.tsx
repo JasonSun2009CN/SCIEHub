@@ -11,6 +11,7 @@ import {
   FaPlus,
   FaSpinner,
   FaTimes,
+  FaUserSecret,
 } from 'react-icons/fa';
 import {
   CATEGORIES,
@@ -72,6 +73,7 @@ export function UploadPage() {
   const [pricingType, setPricingType] = useState<PricingType>('free');
   const [price, setPrice] = useState<string>('9.9');
   const [currency, setCurrency] = useState<Currency>('CNY');
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState('');
   const [markPreview, setMarkPreview] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -158,6 +160,7 @@ export function UploadPage() {
             pricingType,
             price: pricingType === 'paid' ? Number(price) : 0,
             currency,
+            isAnonymous: pricingType === 'free' ? isAnonymous : false,
             previewImageUrl: previewImageUrl.trim() || undefined,
           },
         });
@@ -217,7 +220,7 @@ export function UploadPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <PageMeta title="Upload" description="Create a repository and share your study files on SCIEHub." />
-      <h1 className="text-2xl font-bold">Upload files</h1>
+      <h1 className="font-display text-3xl">Upload files</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Create a new repository or add files to one you own. Multiple files become the repository's content.
       </p>
@@ -240,7 +243,7 @@ export function UploadPage() {
 
       {/* New repo fields */}
       {isNewRepo ? (
-        <div className="mt-5 space-y-5 rounded-lg border border-border bg-surface p-6">
+        <div className="mt-5 space-y-5 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
           <div className="space-y-2">
             <Label htmlFor="repo-name">Repository name *</Label>
             <Input
@@ -305,6 +308,108 @@ export function UploadPage() {
               <Input id="repo-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="waves, trig, exam" />
             </div>
           </div>
+
+          <div className="space-y-4 rounded-2xl border border-border/70 bg-surface-2/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <Label>Pricing</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Free is recommended. Paid listings are introductions only — payment happens off-platform.
+                </p>
+              </div>
+              <div className="flex rounded-full border border-border/70 bg-surface p-1">
+                {(['free', 'paid'] as PricingType[]).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      setPricingType(option);
+                      if (option === 'paid') setIsAnonymous(false);
+                    }}
+                    className={cn(
+                      'cursor-pointer rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                      pricingType === option
+                        ? 'bg-accent-subtle text-accent'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {option === 'free' ? 'Free' : 'Paid'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {pricingType === 'paid' && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="repo-price">Price *</Label>
+                  <Input
+                    id="repo-price"
+                    type="number"
+                    min="0.01"
+                    max={MAX_FILE_PRICE}
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="9.9"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((item) => (
+                        <SelectItem key={item.code} value={item.code}>
+                          {item.symbol} {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground sm:col-span-2">
+                  SCIEHub does not process this payment. The seller receives the buyer&apos;s email
+                  and you arrange payment and delivery directly.
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsAnonymous((value) => !value)}
+              disabled={pricingType === 'paid'}
+              className={cn(
+                'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                isAnonymous
+                  ? 'border-accent/45 bg-accent-subtle text-foreground'
+                  : 'border-border/70 bg-surface/60 text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <FaUserSecret className="h-4 w-4 shrink-0 text-accent" />
+              <span className="flex-1">
+                <span className="font-semibold">Publish anonymously</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Your username is hidden on the listing. Free resources only.
+                </span>
+              </span>
+              <span
+                className={cn(
+                  'flex h-5 w-9 items-center rounded-full p-0.5 transition-colors',
+                  isAnonymous ? 'bg-accent' : 'bg-border',
+                )}
+              >
+                <span
+                  className={cn(
+                    'h-4 w-4 rounded-full bg-background transition-transform',
+                    isAnonymous && 'translate-x-4',
+                  )}
+                />
+              </span>
+            </button>
+          </div>
+
           {availableGroups.length > 0 && (
             <div className="space-y-2">
               <Label>Share to groups (optional)</Label>
@@ -330,7 +435,7 @@ export function UploadPage() {
           )}
         </div>
       ) : (
-        <p className="mt-5 rounded-lg border border-border bg-surface p-4 text-sm text-muted-foreground">
+        <p className="mt-5 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-4 text-sm text-muted-foreground">
           Adding files to <span className="font-medium text-foreground">{availableRepos.find((r) => r.id === targetRepo)?.name}</span>.
         </p>
       )}
@@ -363,7 +468,7 @@ export function UploadPage() {
       {files.length > 0 && (
         <ul className="mt-4 space-y-2">
           {files.map((item) => (
-            <li key={item.id} className="rounded-lg border border-border bg-surface p-3">
+            <li key={item.id} className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-3">
               <div className="flex items-center gap-3">
                 <FileTypeIcon type="other" className="h-5 w-5" />
                 <div className="min-w-0 flex-1">
@@ -399,7 +504,7 @@ export function UploadPage() {
       )}
 
       {/* Submit */}
-      <div className="mt-6 rounded-lg border border-border bg-surface p-4">
+      <div className="mt-6 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-4">
         {files.length > 0 && (
           <div className="mb-4 flex items-center gap-3 rounded-md bg-surface-2 p-3 text-sm">
             <span className="flex items-center gap-2 text-muted-foreground">

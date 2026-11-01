@@ -18,6 +18,10 @@ import {
   refundOrder,
   setReportStatus,
   setUserAdmin,
+  setUserCanBuy,
+  setUserCanChat,
+  setUserCanPublishFree,
+  setUserCanPublishPaid,
   setUserSuspended,
   topUpWallet,
 } from '../db.js';
@@ -106,7 +110,14 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
   app.patch('/api/admin/users/:id', async (c) => {
     await requireAdmin(c);
     const { id } = c.req.param();
-    const body = await readJson<{ isAdmin?: boolean; isSuspended?: boolean }>(c);
+    const body = await readJson<{
+      isAdmin?: boolean;
+      isSuspended?: boolean;
+      canBuy?: boolean;
+      canPublishFree?: boolean;
+      canPublishPaid?: boolean;
+      canChat?: boolean;
+    }>(c);
     if (typeof body.isAdmin === 'boolean' && !body.isAdmin) {
       const target = await getUserById(id);
       if (target?.isAdmin && (await countAdmins()) <= 1) {
@@ -115,6 +126,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     }
     if (typeof body.isAdmin === 'boolean') await setUserAdmin(id, body.isAdmin);
     if (typeof body.isSuspended === 'boolean') await setUserSuspended(id, body.isSuspended);
+    if (typeof body.canBuy === 'boolean') await setUserCanBuy(id, body.canBuy);
+    if (typeof body.canPublishFree === 'boolean') await setUserCanPublishFree(id, body.canPublishFree);
+    if (typeof body.canPublishPaid === 'boolean') await setUserCanPublishPaid(id, body.canPublishPaid);
+    if (typeof body.canChat === 'boolean') await setUserCanChat(id, body.canChat);
     return c.json({ ok: true });
   });
 

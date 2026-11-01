@@ -59,7 +59,7 @@ export function ConductPage() {
       <PageMeta title="Community guidelines" description="The SCIEHub community rules — be respectful, share responsibly." />
       <div className="text-center">
         <FaShieldAlt className="mx-auto h-10 w-10 text-accent" />
-        <h1 className="mt-3 text-2xl font-bold">Community guidelines</h1>
+        <h1 className="mt-3 font-display text-3xl">Community guidelines</h1>
         <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
           SCIEHub works because students look after each other. These ground rules keep the community respectful, useful and safe.
         </p>
@@ -69,7 +69,7 @@ export function ConductPage() {
         {RULES.map(({ Icon, title, description }, i) => (
           <div
             key={title}
-            className="animate-fade-in-up rounded-lg border border-border bg-surface p-6"
+            className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6"
             style={{ animationDelay: `${i * 60}ms` }}
           >
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-subtle text-accent">
@@ -81,7 +81,7 @@ export function ConductPage() {
         ))}
       </div>
 
-      <div className="mt-8 rounded-lg border border-border bg-surface p-6">
+      <div className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <h2 className="flex items-center gap-2 font-semibold">
           <FaBook className="h-4 w-4 text-accent" /> One more thing about files & trading
         </h2>

@@ -37,11 +37,14 @@ npm run db:migrate:remote          # apply migrations to the real D1 database
 
 - Schema/migrations live in `packages/server/migrations/*.sql`; apply them with the `db:migrate:*` scripts. There is no ORM and no runtime schema creation.
 - D1 has no interactive transactions. Multi-statement writes use `db.batch()`; payment/refund invariants are enforced by triggers in `0001_init.sql` (`order_not_pending`, `insufficient_balance`, `order_already_refunded`). Preserve those guards.
-- Paid flow: `POST /repos/:id/checkout` creates a pending order → `POST /users/me/orders/:id/pay` (or `/orders/:id/pay`) charges the buyer wallet and credits the seller minus `PLATFORM_FEE_RATE` → refunds reverse both sides and remove the purchase.
 - Repository taxonomy is three-dimensional: `level_id` (IG / AS / A Level / IB / AP), `category_id` (subject), and `resource_type` (notes / practice / past-paper). Source lists are `LEVELS`, `CATEGORIES`, and `RESOURCE_TYPES` in `packages/shared/src/index.ts`; keep the DB columns, API validation, and UI selects in sync.
-- The marketplace has `/free` and `/paid` zones in addition to `/marketplace`; both reuse `FeedPage` with a locked `pricingType`.
+- Product is **free-first**: `/free` is the main shelf, `/marketplace` shows all, `/paid` is optional. Free resources download directly; paid resources use contact requests, not on-site checkout.
+- `is_anonymous` on repos hides the publisher name. Anonymous publishing is allowed for free resources only; paid listings require a username for seller accountability.
+- Paid flow: `POST /repos/:id/purchase-request` creates a `purchase_requests` row with the buyer's account email. Sellers see it in `/requests`, then arrange payment/delivery off-platform. Internal checkout/pay endpoints intentionally return `410`.
+- The Commons (`/community`) is a global `community_posts` board; users can post by username or anonymously. Admins can delete any post or block `canChat`.
+- Moderation is granular on `users`: `is_suspended` (ban all), `can_buy`, `can_publish_free`, `can_publish_paid`, `can_chat`. Enforce these in API routes, not only admin UI.
 - Uploaded files are written to R2 under UUID names; `files.file_path` is `/uploads/<key>`. Deleting a repo/file/user removes the corresponding R2 objects.
-- File downloads are gated by `owner || purchased || free || preview`; keep access checks in the API, not only the UI.
+- File downloads are gated by `owner || purchased || free || preview`; keep access checks in the API, not only the UI. A completed purchase request unlocks reviews but does not automatically unlock files — delivery is arranged with the seller.
 
 ## Auth / config / deployment
 
@@ -57,4 +60,6 @@ npm run db:migrate:remote          # apply migrations to the real D1 database
 ## Conventions
 
 - 2-space indent, single quotes. Tailwind classes only; theme colors come from CSS variables in `packages/web/src/index.css` and `tailwind.config.js`. Dark theme is default.
-- Icons use `react-icons/fa`; avoid emoji in UI.
+- UI direction is **“Academic Atelier”**: Fraunces display headings (`font-display`), Plus Jakarta Sans body, mint actions, amber premium, parchment light mode and forest dark mode. Reuse `section-shell`, `panel`, `panel-muted`, `eyebrow`, `link-arrow`, and `card-hover` instead of inventing new card styles.
+- Tailwind colors use RGB-channel variables, so opacity utilities such as `bg-surface/75` work. Add new palette colors as both `--name` and `--name-rgb` in `index.css`.
+- Icons use `react-icons/fa`; avoid emoji in UI. Keep hover transitions to color/border/shadow (no layout-shifting scale on cards).

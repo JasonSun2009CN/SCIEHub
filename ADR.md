@@ -75,3 +75,9 @@
 - **Context**: 用户需要按 IG / AS / A-level 学科，以及笔记 / 练习题 / past paper 浏览和筛选资料；原来的单一分类字段无法同时表达这三个维度。
 - **Decision**: Repository 增加 `level_id`（ig / as / a-level / ib / ap / other）与 `resource_type`（notes / practice / past-paper / other），保留 `category_id` 表示学科；共享常量 `LEVELS` / `CATEGORIES` / `RESOURCE_TYPES` 作为前后端唯一来源。新增 `/free` 与 `/paid` 专区，复用 Marketplace 列表并锁定 `pricingType`。
 - **Consequences**: 列表筛选支持 level + subject + resource type + pricing 组合；新增分类需同步 shared 常量、D1 迁移、API 校验和前端选择器。旧数据在迁移后默认落到 `other`。
+
+## ADR-013 免费优先 + 站外付费联系 + 社区与细粒度权限
+- **Status**: Accepted
+- **Context**: 产品定位调整为以免费资料为主；匿名发布和公共社区需要身份保护；平台不承担真实支付/退款风险；管理员需要按功能维度限制账号。
+- **Decision**: `/free` 作为主货架，`/marketplace` 展示全部，`/paid` 为可选。免费资源直接下载；付费资源改为 `purchase_requests`：买家提交请求，卖家在 `/requests` 看到买家邮箱后线下/站外完成交易，站内 checkout/pay 返回 410。新增 `community_posts` 公共社区，支持用户名/匿名发帖。User 增加 `can_buy` / `can_publish_free` / `can_publish_paid` / `can_chat`，`is_suspended` 表示全功能封禁。
+- **Consequences**: 平台不再托管付费交易与资金；付费资源的文件解锁由卖家线下交付，站内只保留联系请求和评价资格；匿名仅限免费资源，避免匿名卖家与付款纠纷；所有权限必须在 API 层校验，管理员 UI 只是入口。

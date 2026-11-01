@@ -1,8 +1,8 @@
 # SCIEHub
 
-A GitHub-style **study-resource sharing & selling marketplace** for international high school students (IB · AS/A-Level · AP · IGCSE).
+A free-first **study-resource library and community** for international high school students (IGCSE · AS/A-Level · IB · AP).
 
-**Share, Buy, Sell, Excel.** Create your own study repositories — each holding multiple files like a GitHub repo — share them into subject groups, list them for **free or at a set price**, earn from every sale via your built-in wallet, and download what you need. Dark-first, GitHub-inspired interface.
+**Free first. Share, ask, Excel.** A **free-first** study-resource library and community for international high school students. Download free notes, practice and past papers, join **The Commons** to talk study, or publish your own work — under your username or anonymously. Optional paid packs are arranged directly with the seller.
 
 ## Tech stack
 
@@ -17,19 +17,18 @@ A GitHub-style **study-resource sharing & selling marketplace** for internationa
 
 ## Features
 
-### Marketplace (buy & sell)
-- **Free & paid zones** — dedicated `/free` and `/paid` zones, plus the full marketplace. Every repository is either **Free** or **Paid**; sellers set a price (¥/$, max 9,999) and a currency.
+### Free-first marketplace
+- **Free-first shelves** — `/free` is the main shelf; `/marketplace` shows everything and `/paid` is the optional paid shelf. Free resources download without checkout.
 - **Curriculum taxonomy** — resources are classified by level (**IGCSE / IG, AS, A Level, IB, AP**), subject (Math, English Literature/Language, Physics, Biology, Computer Science, Chinese, History, Chemistry, Economics, Business, Psychology…), and resource type (**Notes, Practice Questions, Past Papers**).
-- **Checkout** — `/checkout/:id` shows the full price breakdown (item price, 10% platform fee, seller earnings) and lets buyers **pay instantly from their wallet**.
-- **Wallet** — `/wallet` shows your balance, total income/spending and a full transaction history (purchases, sales, refunds, top-ups). Payouts from sales land in your wallet automatically.
-- **Orders** — `/orders` tracks every purchase (as buyer) and sale (as seller). Buyers can pay pending orders; **sellers can refund** a paid order, which reverses the money for both parties.
-- **Purchases** — paid repositories unlock after payment; the **Purchases** tab on your profile lists everything you own, with instant download.
-- **Reviews** — verified buyers (or owners of free resources) can rate a repository 1–5 stars and write a review. Ratings feed into the average shown on each listing.
+- **Anonymous or named publishing** — free resources can be published under your username or anonymously. Anonymous listings hide the publisher identity.
+- **Paid = contact request, not checkout** — a paid listing sends the seller a purchase request containing the buyer's account email. The seller arranges payment and delivery with the buyer on another platform; SCIEHub does not process the transaction.
+- **Reviews** — owners of free resources and buyers whose request was completed can rate a repository 1–5 stars.
 - **Leaderboard** — `/leaderboard` has two views: **Top contributors** (by files shared) and **Top sellers** (by sales + revenue).
 
 ### Community & sharing
-- **Repositories** — users create repos (name, description, category, tags) and upload multiple files into them, GitHub-style.
-- **Feed & search** — browse the marketplace with category + pricing filters (free / paid), sorting (recent / downloaded / viewed / sales / rating / price) and full-text search.
+- **The Commons** — `/community` is a shared public board where every signed-in user can post questions, tips and resource requests, anonymously or by username. Posts refresh automatically.
+- **Repositories** — users create repos (name, description, level, subject, resource type, tags) and upload multiple files into them.
+- **Feed & search** — browse by level, subject, resource type, price, rating and full-text search.
 - **Study groups** — join groups by **requesting membership**; the group creator approves or rejects each request. Groups collect repositories shared into them.
 - **Sharing** — a repo owner can share a repository into any group they belong to (and remove it again).
 - **Community guidelines** — `/conduct` sets the rules; **Report** buttons on every repository and comment store reports for review.
@@ -38,9 +37,10 @@ A GitHub-style **study-resource sharing & selling marketplace** for internationa
 - **Dark/light themes** (dark default) driven by CSS-variable tokens.
 
 ### Admin
-- **Admin console** — `/admin` shows site stats (including total sales & revenue), recent orders, review reports, delete violating repositories/files/comments, and **ban/unban, un-admin or delete users**.
-- **Orders tab** — admins can search all orders, view status, and **refund** paid orders.
-- **Top-up** — admins can add funds to any user's wallet from the Users tab (`/admin` → Users).
+- **Admin console** — `/admin` shows site stats, reports, orders, repositories and users.
+- **Moderation** — ban all features, delete users, and remove repositories, files, comments or community posts.
+- **Granular permissions** — independently allow or block **buying paid resources**, **publishing free content**, **publishing paid content**, and **posting in the community**.
+- **Legacy wallet tools** — admins can still top up wallets and refund legacy orders for older data.
 
 ## Getting started (development)
 
@@ -119,15 +119,14 @@ wrangler.jsonc  # Worker entry, D1/R2/Assets bindings, SPA fallback, cron
 
 | Route | Page |
 | --- | --- |
-| `/` | Home — marketplace hero, trending, top sellers, free resources, active groups |
+| `/` | Home — free-first hero, free shelf, trending, top sellers, community, groups |
 | `/marketplace` (alias `/feed`) | Browse/search resources with level, subject, resource-type and pricing filters |
-| `/free` | Free resources only |
-| `/paid` | Paid resources only |
-| `/repos/:id` | Repository detail — files, price/purchase panel, reviews, comments, share |
-| `/checkout/:id` | Checkout — price breakdown and wallet payment for a paid resource |
-| `/orders` | Your orders — as buyer (pay) and as seller (refund) |
-| `/wallet` | Wallet — balance, income/spending, transaction history |
-| `/upload` | Create a repository / set pricing / add files to one you own |
+| `/free` | Free resources only (main shelf) |
+| `/paid` | Optional paid resources — contact-based requests |
+| `/repos/:id` | Repository detail — files, free download or purchase request, reviews, comments, share |
+| `/community` | The Commons — shared community board (username or anonymous) |
+| `/requests` | Purchase requests — incoming buyer emails and sent requests |
+| `/upload` | Create a repository / choose free or paid / publish anonymously / add files |
 | `/groups` | Group directory + create-group dialog |
 | `/groups/:id` | Group detail — repositories / members (+ join requests) / settings (creator) |
 | `/users/:username` | Public profile — repositories / favorites / purchases / groups |
@@ -140,14 +139,15 @@ wrangler.jsonc  # Worker entry, D1/R2/Assets bindings, SPA fallback, cron
 
 ## User manual
 
-A plain-language guide for buyers and sellers lives in [`docs/USER_MANUAL.md`](./docs/USER_MANUAL.md) — how to price a resource, buy, earn, refund and review.
+A plain-language guide for readers, publishers and sellers lives in [`docs/USER_MANUAL.md`](./docs/USER_MANUAL.md) — how to publish, request paid resources, use the community and review.
 
 ## Notes
 
 - Joining a group creates a **join request**; the group creator (admin) approves/rejects it. Admins cannot leave — they delete the group instead.
-- **Wallet & money** — payments use an internal **wallet balance** (¥ by default). Funds are added by admins via `/admin` → Users → top-up; real payment rails are intentionally out of scope for this MVP. Sellers receive their payout (price minus 10% platform fee) to the wallet automatically when an order is paid.
-- **Refunds** — a seller can refund a paid order from `/orders` (or an admin from `/admin` → Orders); both the buyer's charge and the seller's earning are reversed and the purchase access is removed.
-- **Reviews** — only verified buyers (and owners of free resources) can review. Reviews can be edited or deleted by their author.
+- **Free first** — free resources download directly. Publishing anonymously is available for free resources; paid listings require a username for seller accountability.
+- **Paid resources** — no on-site checkout. A buyer sends a purchase request; the seller sees the buyer's account email in `/requests` and arranges payment and delivery on another platform. SCIEHub does not hold or transfer money for these exchanges.
+- **The Commons** — every signed-in user can post. Admins can block a user's community posting independently of other permissions, and can delete any post.
+- **Reviews** — owners of free resources and buyers whose request was completed can review. Reviews can be edited or deleted by their author.
 - Reports are triaged in `/admin` → Reports.
 - **Email registered without your permission?** If you find your email is already taken on the sign-up page, use that email to write to `jasonsun2009@yeah.net` — the sign-up form includes a ready-made "claim" email link. Never create an account on an email you don't own. Forgot your password? The sign-in form has a "contact the admin to reset it" link to the same address.
 - **Admins** can open `/admin` from their account menu. The **first registered user** on a fresh install becomes the site admin — no default password exists anywhere in the code. Emails in `ADMIN_EMAILS` are auto-promoted on register/login, and existing admins can promote others from the Users tab. Admins can **add other admins** and **step down** (transfer) their own admin role — the last admin is protected from being removed. Tip: register your owner account first so no stranger grabs admin on a public server.

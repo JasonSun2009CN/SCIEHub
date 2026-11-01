@@ -67,3 +67,23 @@ export async function requireAdmin(c: Context<AppEnv>): Promise<AuthUser> {
   if (!user?.isAdmin) throw new HttpError(403, 'Admin access required');
   return auth;
 }
+
+export type Permission = 'canBuy' | 'canPublishFree' | 'canPublishPaid' | 'canChat';
+
+const PERMISSION_MESSAGES: Record<Permission, string> = {
+  canBuy: 'Purchasing is disabled for this account. Contact the admin.',
+  canPublishFree: 'Publishing free resources is disabled for this account.',
+  canPublishPaid: 'Publishing paid resources is disabled for this account.',
+  canChat: 'Community posting is disabled for this account.',
+};
+
+/** Requires both a valid session and a specific moderation permission. */
+export async function requirePermission(
+  c: Context<AppEnv>,
+  permission: Permission,
+): Promise<AuthUser> {
+  const auth = await requireAuth(c);
+  const user = await getUserById(auth.id);
+  if (!user?.[permission]) throw new HttpError(403, PERMISSION_MESSAGES[permission]);
+  return auth;
+}

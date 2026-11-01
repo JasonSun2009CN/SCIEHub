@@ -107,13 +107,13 @@ export function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       <PageMeta title="Settings" description="Manage your SCIEHub account." />
-      <h1 className="flex items-center gap-2 text-2xl font-bold">
+      <h1 className="flex items-center gap-2 font-display text-3xl">
         <FaUserEdit className="h-6 w-6 text-accent" /> Settings
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">Manage your profile, preferences and security.</p>
 
       {/* Profile */}
-      <section className="mt-8 rounded-lg border border-border bg-surface p-6">
+      <section className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <h2 className="font-semibold">Profile</h2>
         <div className="mt-5 flex flex-wrap items-center gap-6">
           <div className="text-center">
@@ -165,7 +165,7 @@ export function SettingsPage() {
       <Separator className="my-8" />
 
       {/* Notifications */}
-      <section className="rounded-lg border border-border bg-surface p-6">
+      <section className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <h2 className="flex items-center gap-2 font-semibold">
           <FaBell className="h-4 w-4 text-accent" /> Notifications
         </h2>
@@ -190,7 +190,7 @@ export function SettingsPage() {
       <Separator className="my-8" />
 
       {/* Password */}
-      <section className="rounded-lg border border-border bg-surface p-6">
+      <section className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <h2 className="flex items-center gap-2 font-semibold">
           <FaKey className="h-4 w-4 text-accent" /> Change password
         </h2>

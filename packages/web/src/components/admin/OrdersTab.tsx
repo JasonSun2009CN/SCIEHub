@@ -101,11 +101,11 @@ export function OrdersTab() {
           ))}
         </div>
       ) : orders.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface py-16 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft py-16 text-center text-sm text-muted-foreground">
           No orders match these filters.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-surface">
+        <div className="overflow-hidden rounded-2xl border border-border/75 bg-surface/75 shadow-soft">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border bg-surface-2 text-xs uppercase tracking-wide text-muted-foreground">

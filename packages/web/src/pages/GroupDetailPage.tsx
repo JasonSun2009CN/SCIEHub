@@ -200,7 +200,7 @@ export function GroupDetailPage() {
       </Link>
 
       {/* Header */}
-      <div className="animate-fade-in-up rounded-lg border border-border bg-surface p-6">
+      <div className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent-subtle text-accent">
@@ -208,7 +208,7 @@ export function GroupDetailPage() {
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold">{group.name}</h1>
+                <h1 className="font-display text-3xl">{group.name}</h1>
                 <Badge>{group.categoryName}</Badge>
                 {group.isAdmin && <Badge variant="warning">Admin</Badge>}
               </div>
@@ -257,7 +257,7 @@ export function GroupDetailPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-border bg-surface py-16 text-center text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft py-16 text-center text-sm text-muted-foreground">
               No repositories shared here yet.
               {group.isMember && (
                 <div className="mt-3">
@@ -273,7 +273,7 @@ export function GroupDetailPage() {
         <TabsContent value="members">
           {/* Pending requests (admin only) */}
           {isAdmin && pendingCount > 0 && (
-            <div className="mb-6 rounded-lg border border-border bg-surface p-5">
+            <div className="mb-6 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5">
               <h3 className="flex items-center gap-2 text-sm font-semibold">
                 <FaUserClock className="h-4 w-4 text-warning" /> Join requests ({pendingCount})
               </h3>
@@ -311,7 +311,7 @@ export function GroupDetailPage() {
             </div>
           )}
 
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-2xl border border-border/75 bg-surface/75 shadow-soft">
             {membersData?.items.map((m) => (
               <li key={m.userId} className="flex items-center gap-3 p-4">
                 <UserAvatar nickname={m.user.nickname} username={m.user.username} avatarUrl={m.user.avatarUrl} />
@@ -335,7 +335,7 @@ export function GroupDetailPage() {
                 e.preventDefault();
                 updateMutation.mutate();
               }}
-              className="max-w-xl space-y-5 rounded-lg border border-border bg-surface p-6"
+              className="max-w-xl space-y-5 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6"
             >
               <div className="space-y-2">
                 <Label htmlFor="edit-name">Group name</Label>

@@ -92,7 +92,7 @@ export function ReportsTab() {
         ))}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-border/75 bg-surface/75 shadow-soft">
         {isLoading && offset === 0 ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 5 }).map((_, i) => (

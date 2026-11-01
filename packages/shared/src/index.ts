@@ -26,6 +26,10 @@ export interface User {
   totalPurchases: number;
   isAdmin?: boolean;
   isSuspended?: boolean;
+  canBuy?: boolean;
+  canPublishFree?: boolean;
+  canPublishPaid?: boolean;
+  canChat?: boolean;
   email?: string;
 }
 
@@ -61,7 +65,18 @@ export interface Repository {
   isFavorite?: boolean;
   isOwner?: boolean;
   isPurchased?: boolean;
+  isAnonymous: boolean;
   previewImageUrl?: string;
+}
+
+export interface CommunityPost {
+  id: string;
+  userId: string;
+  author: User;
+  content: string;
+  isAnonymous: boolean;
+  createdAt: string;
+  isOwn?: boolean;
 }
 
 export interface RepoFile {
@@ -327,6 +342,24 @@ export interface PurchaseRecord {
   price: number;
   currency: Currency;
   purchasedAt: string;
+}
+
+export type PurchaseRequestStatus = 'pending' | 'contacted' | 'completed' | 'declined' | 'cancelled';
+
+export interface PurchaseRequest {
+  id: string;
+  repoId: string;
+  repo: Repository;
+  buyerId: string;
+  buyer: User;
+  sellerId: string;
+  seller: User;
+  /** Only returned to the seller (and admins); never to the buyer. */
+  buyerEmail?: string;
+  message: string;
+  status: PurchaseRequestStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Review {

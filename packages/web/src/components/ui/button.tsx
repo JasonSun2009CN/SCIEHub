@@ -4,22 +4,26 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none',
+  'inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold tracking-tight transition-[background-color,border-color,color,box-shadow,filter] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:brightness-110',
-        secondary: 'border border-border bg-surface-2 text-foreground hover:brightness-110',
-        outline: 'border border-border bg-transparent text-foreground hover:bg-surface-2',
-        ghost: 'text-foreground hover:bg-surface-2',
-        danger: 'bg-error text-background hover:brightness-110',
+        default:
+          'bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgb(255_255_255_/_0.25)] hover:brightness-105 hover:shadow-glow',
+        secondary:
+          'border border-border/80 bg-surface-2/80 text-foreground hover:border-accent/40 hover:bg-surface-2',
+        outline:
+          'border border-border bg-transparent text-foreground hover:border-accent/50 hover:bg-accent-subtle hover:text-accent',
+        ghost: 'text-muted-foreground hover:bg-surface-2 hover:text-foreground',
+        danger:
+          'bg-error text-white shadow-[inset_0_1px_0_rgb(255_255_255_/_0.2)] hover:brightness-110',
         link: 'text-accent underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-9 px-4 py-2',
-        sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-10 rounded-md px-6 text-base',
-        icon: 'h-9 w-9',
+        default: 'h-10 px-5 py-2',
+        sm: 'h-8 px-3 text-xs',
+        lg: 'h-12 px-7 text-[15px]',
+        icon: 'h-10 w-10',
       },
     },
     defaultVariants: {

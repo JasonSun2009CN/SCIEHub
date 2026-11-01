@@ -44,7 +44,7 @@ export function ContributingPage() {
       />
       <div className="text-center">
         <FaHeart className="mx-auto h-10 w-10 text-error" />
-        <h1 className="mt-3 text-2xl font-bold">Help improve SCIEHub</h1>
+        <h1 className="mt-3 font-display text-3xl">Help improve SCIEHub</h1>
         <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
           SCIEHub is built for students, by students — and it only gets better with your feedback and contributions.
           Whatever you have in mind, you're very welcome to get involved.
@@ -55,7 +55,7 @@ export function ContributingPage() {
         {WAYS.map(({ Icon, title, description, actionLabel, href, external }, i) => (
           <div
             key={title}
-            className="animate-fade-in-up flex flex-col gap-4 rounded-lg border border-border bg-surface p-6 sm:flex-row sm:items-center"
+            className="animate-fade-in-up flex flex-col gap-4 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6 sm:flex-row sm:items-center"
             style={{ animationDelay: `${i * 60}ms` }}
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent">
@@ -78,7 +78,7 @@ export function ContributingPage() {
         ))}
       </div>
 
-      <div className="mt-8 rounded-lg border border-border bg-surface p-6 text-sm text-muted-foreground">
+      <div className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6 text-sm text-muted-foreground">
         <h2 className="font-semibold text-foreground">A few ground rules</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>All contributions must follow the <Link to="/conduct" className="text-accent hover:underline">community guidelines</Link>.</li>

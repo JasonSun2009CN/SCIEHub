@@ -5,7 +5,6 @@ import {
   FaArrowLeft,
   FaCheck,
   FaCloudUploadAlt,
-  FaCoins,
   FaComment,
   FaDownload,
   FaEdit,
@@ -18,6 +17,7 @@ import {
   FaPaperclip,
   FaShoppingCart,
   FaSpinner,
+  FaUserSecret,
   FaStar,
   FaTrash,
 } from 'react-icons/fa';
@@ -26,7 +26,6 @@ import {
   CURRENCIES,
   LEVELS,
   MAX_FILE_PRICE,
-  PLATFORM_FEE_RATE,
   RESOURCE_TYPES,
   formatBytes,
   formatPrice,
@@ -35,6 +34,7 @@ import {
   type EducationLevel,
   type Group,
   type PricingType,
+  type PurchaseRequest,
   type ResourceType,
   type RepoFile,
   type Repository,
@@ -92,7 +92,10 @@ export function RepoDetailPage() {
   const [editPricingType, setEditPricingType] = useState<PricingType>('free');
   const [editPrice, setEditPrice] = useState('');
   const [editCurrency, setEditCurrency] = useState<Currency>('CNY');
+  const [editIsAnonymous, setEditIsAnonymous] = useState(false);
   const [editPreviewImageUrl, setEditPreviewImageUrl] = useState('');
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestMessage, setRequestMessage] = useState('');
   // Review form
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState('');
@@ -115,6 +118,12 @@ export function RepoDetailPage() {
     queryKey: ['myGroups', user?.username],
     queryFn: () => api<{ items: Group[] }>(`/users/${user!.username}/groups`),
     enabled: Boolean(user),
+  });
+
+  const { data: requestData } = useQuery({
+    queryKey: ['purchase-request', id, user?.id],
+    queryFn: () => api<{ request: PurchaseRequest | null }>(`/repos/${id}/purchase-request`),
+    enabled: Boolean(id && user && data?.repo.pricingType === 'paid' && !data?.repo.isOwner),
   });
 
   const invalidateRepo = () => {
@@ -183,6 +192,7 @@ export function RepoDetailPage() {
           pricingType: editPricingType,
           price: editPricingType === 'paid' ? Number(editPrice) : 0,
           currency: editCurrency,
+          isAnonymous: editPricingType === 'free' ? editIsAnonymous : false,
           previewImageUrl: editPreviewImageUrl.trim() || null,
         },
       }),
@@ -194,6 +204,22 @@ export function RepoDetailPage() {
       toast('Repository updated', 'success');
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not update repository', 'error'),
+  });
+
+  const requestMutation = useMutation({
+    mutationFn: () =>
+      api<{ request: PurchaseRequest }>(`/repos/${id}/purchase-request`, {
+        method: 'POST',
+        json: { message: requestMessage.trim() },
+      }),
+    onSuccess: () => {
+      setRequestOpen(false);
+      setRequestMessage('');
+      queryClient.invalidateQueries({ queryKey: ['purchase-request', id, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      toast('Request sent — the seller can now see your email.', 'success');
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not send request', 'error'),
   });
 
   const reviewMutation = useMutation({
@@ -286,7 +312,7 @@ export function RepoDetailPage() {
   const isPurchased = purchaseState?.isPurchased ?? repo.isPurchased ?? false;
   const canReview = purchaseState?.canReview ?? false;
   const needsPurchase = repo.pricingType === 'paid' && !isOwner && !isPurchased;
-  const platformFee = repo.pricingType === 'paid' ? repo.price * PLATFORM_FEE_RATE : 0;
+  const pendingRequest = requestData?.request ?? null;
 
   const openEdit = () => {
     setEditName(repo.name);
@@ -298,6 +324,7 @@ export function RepoDetailPage() {
     setEditPricingType(repo.pricingType);
     setEditPrice(repo.pricingType === 'paid' ? String(repo.price) : '');
     setEditCurrency(repo.currency);
+    setEditIsAnonymous(repo.isAnonymous);
     setEditPreviewImageUrl(repo.previewImageUrl ?? '');
     setEditOpen(true);
   };
@@ -313,7 +340,7 @@ export function RepoDetailPage() {
         {/* Main */}
         <div className="lg:col-span-8">
           {/* Header */}
-          <div className="animate-fade-in-up rounded-lg border border-border bg-surface p-6">
+          <div className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
             <div className="flex items-start gap-4">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent">
                 <FaFolder className="h-6 w-6" aria-hidden />
@@ -335,17 +362,28 @@ export function RepoDetailPage() {
                   ))}
                   <span className="ml-auto text-xs text-muted-foreground">{formatBytes(repo.totalBytes)} total</span>
                 </div>
-                <h1 className="mt-2 text-2xl font-bold leading-tight">{repo.name}</h1>
+                <h1 className="mt-2 font-display text-3xl leading-tight sm:text-4xl">{repo.name}</h1>
               </div>
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <UserAvatar nickname={repo.owner.nickname} username={repo.owner.username} avatarUrl={repo.owner.avatarUrl} size="md" />
               <div className="text-sm">
-                <Link to={`/users/${repo.owner.username}`} className="font-medium hover:text-accent">
-                  {repo.owner.nickname}
-                </Link>
-                <div className="text-xs text-muted-foreground">@{repo.owner.username}</div>
+                {repo.isAnonymous ? (
+                  <>
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <FaUserSecret className="h-3.5 w-3.5 text-accent" /> Anonymous
+                    </span>
+                    <div className="text-xs text-muted-foreground">Publisher identity hidden</div>
+                  </>
+                ) : (
+                  <>
+                    <Link to={`/users/${repo.owner.username}`} className="font-medium hover:text-accent">
+                      {repo.owner.nickname}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">@{repo.owner.username}</div>
+                  </>
+                )}
               </div>
               <span className="ml-auto text-xs text-muted-foreground">Created {timeAgo(repo.createdAt)}</span>
             </div>
@@ -404,7 +442,7 @@ export function RepoDetailPage() {
           </div>
 
           {/* Description + shared groups */}
-          <div className="animate-fade-in-up mt-6 rounded-lg border border-border bg-surface p-6" style={{ animationDelay: '60ms' }}>
+          <div className="animate-fade-in-up mt-6 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6" style={{ animationDelay: '60ms' }}>
             <h2 className="font-semibold">Description</h2>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
               {repo.description || 'No description provided.'}
@@ -454,7 +492,7 @@ export function RepoDetailPage() {
           </div>
 
           {/* Files */}
-          <div className="animate-fade-in-up mt-6 rounded-lg border border-border bg-surface p-6" style={{ animationDelay: '120ms' }}>
+          <div className="animate-fade-in-up mt-6 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6" style={{ animationDelay: '120ms' }}>
             <h2 className="mb-4 flex items-center gap-2 font-semibold">
               <FaPaperclip className="h-4 w-4 text-accent" /> Files ({formatNumber(repo.fileCount)})
             </h2>
@@ -466,18 +504,22 @@ export function RepoDetailPage() {
                   <p className="font-medium text-foreground">This is a paid resource</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {files.length > 0
-                      ? `You can preview ${files.length} file${files.length === 1 ? '' : 's'}. Buy to unlock all ${
-                          formatNumber(repo.fileCount)
-                        } files for download.`
-                      : `All ${formatNumber(repo.fileCount)} files are locked. Buy to unlock them.`}
+                      ? `You can preview ${files.length} file${files.length === 1 ? '' : 's'}. Request contact with the seller to arrange the full ${formatNumber(repo.fileCount)}-file pack.`
+                      : `All ${formatNumber(repo.fileCount)} files are locked. Request contact with the seller to arrange access.`}
                   </p>
                 </div>
                 <Button
                   size="sm"
                   className="ml-auto shrink-0"
-                  onClick={() => navigate(`/checkout/${repo.id}`)}
+                  onClick={() => setRequestOpen(true)}
+                  disabled={Boolean(pendingRequest)}
                 >
-                  <FaShoppingCart className="h-3.5 w-3.5" /> Buy now
+                  <FaShoppingCart className="h-3.5 w-3.5" />
+                  {pendingRequest
+                    ? pendingRequest.status === 'completed'
+                      ? 'Exchange completed'
+                      : 'Request sent'
+                    : 'Request purchase'}
                 </Button>
               </div>
             )}
@@ -531,7 +573,7 @@ export function RepoDetailPage() {
           </div>
 
           {/* Comments */}
-          <div className="animate-fade-in-up mt-6 rounded-lg border border-border bg-surface p-6" style={{ animationDelay: '180ms' }}>
+          <div className="animate-fade-in-up mt-6 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6" style={{ animationDelay: '180ms' }}>
             <h2 className="mb-4 flex items-center gap-2 font-semibold">
               <FaComment className="h-4 w-4 text-accent" /> Comments ({commentsData?.items.length ?? 0})
             </h2>
@@ -600,7 +642,7 @@ export function RepoDetailPage() {
           </div>
 
           {/* Reviews */}
-          <div className="animate-fade-in-up mt-6 rounded-lg border border-border bg-surface p-6" style={{ animationDelay: '200ms' }}>
+          <div className="animate-fade-in-up mt-6 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6" style={{ animationDelay: '200ms' }}>
             <h2 className="mb-4 flex flex-wrap items-center gap-2 font-semibold">
               <FaStar className="h-4 w-4 text-warning" aria-hidden /> Reviews ({reviews.length})
               {repo.averageRating > 0 && (
@@ -686,10 +728,7 @@ export function RepoDetailPage() {
               </form>
             ) : needsPurchase ? (
               <p className="mb-6 rounded-md bg-surface-2 p-3 text-sm text-muted-foreground">
-                Purchase this resource to leave a review.{' '}
-                <Button size="sm" variant="link" asChild className="px-0">
-                  <Link to={`/checkout/${repo.id}`}>Buy now</Link>
-                </Button>
+                Reviews are available after the seller marks your purchase request as completed.
               </p>
             ) : !user ? (
               <p className="mb-6 rounded-md bg-surface-2 p-3 text-sm text-muted-foreground">
@@ -777,7 +816,7 @@ export function RepoDetailPage() {
         <aside className="space-y-6 lg:col-span-4">
           {/* Purchase / pricing */}
           <div
-            className="animate-fade-in-up rounded-lg border border-border bg-surface p-5"
+            className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5"
             style={{ animationDelay: '200ms' }}
           >
             <div className="flex items-center justify-between">
@@ -806,27 +845,21 @@ export function RepoDetailPage() {
               </>
             ) : isOwner ? (
               <>
-                <p className="mt-2 text-3xl font-extrabold text-accent tabular-nums">
+                <p className="mt-2 text-3xl font-extrabold text-warning tabular-nums">
                   {formatPrice(repo.price, repo.currency)}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">You own this listing.</p>
-                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 text-center">
-                  <div>
-                    <div className="font-semibold tabular-nums">{formatNumber(repo.totalSales)}</div>
-                    <div className="text-xs text-muted-foreground">Sales</div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-success tabular-nums">
-                      {formatPrice(repo.totalRevenue, repo.currency)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Revenue</div>
-                  </div>
+                <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-xs text-muted-foreground">
+                  <p>
+                    Buyers send a request with their email. You arrange payment and delivery on another
+                    platform — SCIEHub does not process the transaction.
+                  </p>
                 </div>
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <FaCoins className="h-3.5 w-3.5 text-success" aria-hidden />
-                  You keep {formatPrice(repo.price - platformFee, repo.currency)} per sale after the
-                  {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee.
-                </p>
+                <Button className="mt-4 w-full" variant="secondary" asChild>
+                  <Link to="/requests">
+                    <FaShoppingCart className="h-4 w-4" /> View purchase requests
+                  </Link>
+                </Button>
               </>
             ) : isPurchased ? (
               <>
@@ -837,82 +870,103 @@ export function RepoDetailPage() {
                   All {formatNumber(repo.fileCount)} files are unlocked. Download them below.
                 </p>
               </>
-            ) : (
+            ) : pendingRequest ? (
               <>
-                <p className="mt-2 text-3xl font-extrabold text-accent tabular-nums">
-                  {formatPrice(repo.price, repo.currency)}
+                <p className="mt-2 flex items-center gap-2 text-lg font-bold text-success">
+                  <FaCheck className="h-5 w-5" aria-hidden />
+                  {pendingRequest.status === 'completed' ? 'Exchange completed' : 'Request sent'}
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  One-time purchase · instant access · you keep the files forever.
+                  {pendingRequest.status === 'completed'
+                    ? 'The seller marked this exchange as completed. You can now leave a review.'
+                    : 'The seller can see your account email and will contact you to arrange payment and delivery outside SCIEHub.'}
                 </p>
-                <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-xs text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Item price</span>
-                    <span className="tabular-nums">{formatPrice(repo.price, repo.currency)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Platform fee ({Math.round(PLATFORM_FEE_RATE * 100)}%)</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {formatPrice(platformFee, repo.currency)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-medium text-foreground">
-                    <span>Total due</span>
-                    <span className="text-accent tabular-nums">{formatPrice(repo.price, repo.currency)}</span>
-                  </div>
-                </div>
+                <Button className="mt-4 w-full" variant="secondary" asChild>
+                  <Link to="/requests">Track this request</Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-3xl font-extrabold text-warning tabular-nums">
+                  {formatPrice(repo.price, repo.currency)}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  This is an introduction, not an on-site checkout. Send a request and the seller
+                  receives your email. Payment and delivery happen on another platform.
+                </p>
                 <Button
                   className="mt-4 w-full"
                   size="lg"
-                  onClick={() => navigate(`/checkout/${repo.id}`)}
+                  onClick={() => setRequestOpen(true)}
+                  disabled={!user}
                 >
-                  <FaShoppingCart className="h-4 w-4" /> Buy now
+                  <FaShoppingCart className="h-4 w-4" /> Request purchase
                 </Button>
                 {!user && (
                   <p className="mt-2 text-center text-xs text-muted-foreground">
                     <Link to="/auth" state={{ from: window.location.pathname }} className="text-accent hover:underline">
                       Sign in
                     </Link>{' '}
-                    to purchase.
+                    to contact the seller.
                   </p>
                 )}
               </>
             )}
           </div>
 
-          <div className="animate-fade-in-up rounded-lg border border-border bg-surface p-5" style={{ animationDelay: '240ms' }}>
-            <h3 className="text-sm font-semibold">Owner</h3>
+          <div className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5" style={{ animationDelay: '240ms' }}>
+            <h3 className="text-sm font-semibold">Publisher</h3>
             <div className="mt-3 flex items-center gap-3">
               <UserAvatar nickname={repo.owner.nickname} username={repo.owner.username} avatarUrl={repo.owner.avatarUrl} size="lg" />
               <div className="min-w-0">
-                <Link to={`/users/${repo.owner.username}`} className="block truncate font-semibold hover:text-accent">
-                  {repo.owner.nickname}
-                </Link>
-                <span className="text-xs text-muted-foreground">@{repo.owner.username}</span>
+                {repo.isAnonymous ? (
+                  <>
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <FaUserSecret className="h-3.5 w-3.5 text-accent" /> Anonymous
+                    </span>
+                    <span className="text-xs text-muted-foreground">Identity hidden by publisher</span>
+                  </>
+                ) : (
+                  <>
+                    <Link to={`/users/${repo.owner.username}`} className="block truncate font-semibold hover:text-accent">
+                      {repo.owner.nickname}
+                    </Link>
+                    <span className="text-xs text-muted-foreground">@{repo.owner.username}</span>
+                  </>
+                )}
               </div>
             </div>
-            {repo.owner.bio && <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{repo.owner.bio}</p>}
-            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
-              <div>
-                <div className="font-semibold">{repo.owner.repoCount}</div>
-                <div className="text-xs text-muted-foreground">Repos</div>
-              </div>
-              <div>
-                <div className="font-semibold">{repo.owner.fileCount}</div>
-                <div className="text-xs text-muted-foreground">Files</div>
-              </div>
-              <div>
-                <div className="font-semibold">{formatBytes(repo.owner.totalBytes)}</div>
-                <div className="text-xs text-muted-foreground">Shared</div>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" asChild className="mt-4 w-full">
-              <Link to={`/users/${repo.owner.username}`}>View profile</Link>
-            </Button>
+            {repo.isAnonymous ? (
+              <p className="mt-4 rounded-xl bg-surface-2 p-3 text-xs leading-5 text-muted-foreground">
+                This resource was published anonymously. Free downloads are still available, and paid
+                requests are forwarded to the verified account owner.
+              </p>
+            ) : (
+              <>
+                {repo.owner.bio && <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{repo.owner.bio}</p>}
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
+                  <div>
+                    <div className="font-semibold">{repo.owner.repoCount}</div>
+                    <div className="text-xs text-muted-foreground">Repos</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold">{repo.owner.fileCount}</div>
+                    <div className="text-xs text-muted-foreground">Files</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold">{formatBytes(repo.owner.totalBytes)}</div>
+                    <div className="text-xs text-muted-foreground">Shared</div>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" asChild className="mt-4 w-full">
+                  <Link to={`/users/${repo.owner.username}`}>View profile</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {related.length > 0 && (
-            <div className="animate-fade-in-up rounded-lg border border-border bg-surface p-5" style={{ animationDelay: '300ms' }}>
+            <div className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5" style={{ animationDelay: '300ms' }}>
               <h3 className="mb-3 text-sm font-semibold">Related repositories</h3>
               <ul className="space-y-3">
                 {related.map((r) => (
@@ -932,7 +986,7 @@ export function RepoDetailPage() {
             </div>
           )}
 
-          <div className="animate-fade-in-up rounded-lg border border-border bg-surface p-5 text-sm text-muted-foreground" style={{ animationDelay: '360ms' }}>
+          <div className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5 text-sm text-muted-foreground" style={{ animationDelay: '360ms' }}>
             <div className="flex items-center gap-1.5 text-success">
               <FaCheck className="h-3.5 w-3.5" /> Last updated {formatDate(repo.createdAt)}
             </div>
@@ -1044,7 +1098,13 @@ export function RepoDetailPage() {
             <Separator />
             <div className="space-y-2">
               <Label>Pricing</Label>
-              <Select value={editPricingType} onValueChange={(v) => setEditPricingType(v as PricingType)}>
+              <Select
+                value={editPricingType}
+                onValueChange={(v) => {
+                  setEditPricingType(v as PricingType);
+                  if (v === 'paid') setEditIsAnonymous(false);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Free or paid" />
                 </SelectTrigger>
@@ -1054,9 +1114,43 @@ export function RepoDetailPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Free resources are downloadable by everyone. Paid resources are unlocked after purchase.
+                Free resources are downloadable by everyone. Paid resources collect contact requests;
+                payment happens off-platform.
               </p>
             </div>
+            {editPricingType === 'free' && (
+              <button
+                type="button"
+                onClick={() => setEditIsAnonymous((value) => !value)}
+                className={cn(
+                  'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-left text-sm transition-colors',
+                  editIsAnonymous
+                    ? 'border-accent/45 bg-accent-subtle text-foreground'
+                    : 'border-border/70 bg-surface text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <FaUserSecret className="h-4 w-4 shrink-0 text-accent" />
+                <span className="flex-1">
+                  <span className="font-semibold">Publish anonymously</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Hide your username on this free listing.
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'flex h-5 w-9 items-center rounded-full p-0.5 transition-colors',
+                    editIsAnonymous ? 'bg-accent' : 'bg-border',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'h-4 w-4 rounded-full bg-background transition-transform',
+                      editIsAnonymous && 'translate-x-4',
+                    )}
+                  />
+                </span>
+              </button>
+            )}
             {editPricingType === 'paid' && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -1113,6 +1207,52 @@ export function RepoDetailPage() {
             >
               {updateMutation.isPending && <FaSpinner className="h-4 w-4 animate-spin" />}
               Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request purchase</DialogTitle>
+            <DialogDescription>
+              The seller receives your account email and can contact you. SCIEHub does not process
+              payment — you arrange it directly on another platform.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border/70 bg-surface-2/50 p-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Resource</span>
+                <span className="text-right font-medium">{repo.name}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Listed price</span>
+                <span className="font-semibold tabular-nums text-warning">
+                  {formatPrice(repo.price, repo.currency)}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="request-message">Message to seller (optional)</Label>
+              <Textarea
+                id="request-message"
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                placeholder="Tell the seller what you need, or how you'd like to be contacted."
+                rows={3}
+                maxLength={1000}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRequestOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => requestMutation.mutate()} disabled={requestMutation.isPending}>
+              {requestMutation.isPending && <FaSpinner className="h-4 w-4 animate-spin" />}
+              Send request
             </Button>
           </DialogFooter>
         </DialogContent>

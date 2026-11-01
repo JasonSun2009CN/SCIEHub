@@ -47,7 +47,7 @@ export function OverviewTab() {
     <div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {tiles.map(({ Icon, label, value, warn, accent, money }) => (
-          <div key={label} className="rounded-lg border border-border bg-surface p-4">
+          <div key={label} className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{label}</span>
               <Icon className={warn ? 'h-4 w-4 text-error' : 'h-4 w-4 text-accent'} />
@@ -63,7 +63,7 @@ export function OverviewTab() {
         ))}
       </div>
 
-      <div className="mt-8 rounded-lg border border-border bg-surface p-5">
+      <div className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5">
         <h2 className="text-sm font-semibold">Recent reports</h2>
         {data.recentReports.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No reports yet.</p>
@@ -90,7 +90,7 @@ export function OverviewTab() {
         )}
       </div>
 
-      <div className="mt-8 rounded-lg border border-border bg-surface p-5">
+      <div className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5">
         <h2 className="text-sm font-semibold">Recent orders</h2>
         {data.recentOrders.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No orders yet.</p>

@@ -60,7 +60,7 @@ export function AccountSafetySection() {
   return (
     <div className="space-y-8">
       {/* Login history */}
-      <section className="rounded-lg border border-border bg-surface p-6">
+      <section className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <h2 className="flex items-center gap-2 font-semibold">
           <FaHistory className="h-4 w-4 text-accent" /> Login history
         </h2>

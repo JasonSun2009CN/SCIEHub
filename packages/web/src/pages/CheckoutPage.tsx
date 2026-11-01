@@ -95,7 +95,7 @@ export function CheckoutPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
         <Skeleton className="h-8 w-48" />
-        <div className="mt-6 space-y-3 rounded-lg border border-border bg-surface p-6">
+        <div className="mt-6 space-y-3 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-4 w-1/2" />
           <Skeleton className="h-4 w-3/4" />
@@ -136,9 +136,9 @@ export function CheckoutPage() {
   if (paidOrderNo || repo.isPurchased) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-border bg-surface p-10">
+        <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-10">
           <FaCheckCircle className="mx-auto h-14 w-14 text-success" aria-hidden />
-          <h1 className="mt-5 text-2xl font-bold">Purchase complete</h1>
+          <h1 className="mt-5 font-display text-3xl">Purchase complete</h1>
           <p className="mt-2 text-muted-foreground">
             {paidOrderNo ? (
               <>
@@ -176,13 +176,13 @@ export function CheckoutPage() {
 
       <div className="mb-6 flex items-center gap-2">
         <FaLock className="h-4 w-4 text-accent" aria-hidden />
-        <h1 className="text-2xl font-bold">Checkout</h1>
+        <h1 className="font-display text-3xl">Checkout</h1>
         <Badge variant="outline" className="ml-1">Secure</Badge>
       </div>
 
       <div className="space-y-6">
         {/* Item summary */}
-        <div className="rounded-lg border border-border bg-surface p-6">
+        <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
           <div className="flex items-start gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent">
               <FaFolder className="h-6 w-6" aria-hidden />
@@ -210,7 +210,7 @@ export function CheckoutPage() {
         </div>
 
         {/* Price breakdown */}
-        <div className="rounded-lg border border-border bg-surface p-6">
+        <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
           <h2 className="text-sm font-semibold">Order summary</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div className="flex items-center justify-between">
@@ -239,7 +239,7 @@ export function CheckoutPage() {
         </div>
 
         {/* Payment */}
-        <div className="rounded-lg border border-border bg-surface p-6">
+        <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <FaWallet className="h-4 w-4 text-accent" aria-hidden />
             Pay from wallet

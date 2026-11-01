@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 export function WelcomeBanner({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
-      <div className="animate-fade-in-up flex flex-wrap items-center gap-4 rounded-lg border border-accent bg-accent-subtle p-4">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+      <div className="animate-fade-in-up flex flex-wrap items-center gap-4 rounded-2xl border border-accent/25 bg-accent-subtle p-4 shadow-soft">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <FaHeart className="h-5 w-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">

@@ -88,11 +88,11 @@ export function UserProfilePage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <PageMeta title={`${user.nickname} (@${user.username})`} description={user.bio} />
 
-      <div className="animate-fade-in-up rounded-lg border border-border bg-surface p-6">
+      <div className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <div className="flex flex-wrap items-center gap-5">
           <UserAvatar nickname={user.nickname} username={user.username} avatarUrl={user.avatarUrl} size="lg" />
           <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <h1 className="flex items-center gap-2 font-display text-3xl">
               {user.nickname}
               {user.nickname === user.username ? null : (
                 <span className="text-base font-normal text-muted-foreground">@{user.username}</span>
@@ -178,7 +178,7 @@ export function UserProfilePage() {
                 {purchases.items.map((p) => (
                   <li
                     key={p.id}
-                    className="animate-fade-in-up flex flex-wrap items-center gap-4 rounded-lg border border-border bg-surface p-4"
+                    className="animate-fade-in-up flex flex-wrap items-center gap-4 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-4"
                   >
                     <div className="min-w-0 flex-1">
                       <Link to={`/repos/${p.repo.id}`} className="truncate font-semibold hover:text-accent">
@@ -210,7 +210,7 @@ export function UserProfilePage() {
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-border bg-surface py-16 text-center text-sm text-muted-foreground">
+    <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft py-16 text-center text-sm text-muted-foreground">
       {text}
     </div>
   );

@@ -13,7 +13,6 @@ import {
   listUserLogins,
   listUserOrders,
   listWalletTransactions,
-  payOrderWithWallet,
   refundOrder,
   setDeactivated,
   topUpWallet,
@@ -112,21 +111,8 @@ export function registerMeRoutes(app: Hono<AppEnv>): void {
   });
 
   app.post('/api/users/me/orders/:orderId/pay', async (c) => {
-    const authUser = await requireAuth(c);
-    const { orderId } = c.req.param();
-    const order = await getOrderById(orderId);
-    if (!order) return c.json({ error: 'Order not found' }, 404);
-    if (order.buyerId !== authUser.id) {
-      return c.json({ error: 'Only the buyer can pay this order' }, 403);
-    }
-    if (order.status !== 'pending') {
-      return c.json({ error: `Order is already ${order.status}` }, 400);
-    }
-    const result = await payOrderWithWallet(orderId, authUser.id);
-    if (!result.success) {
-      return c.json({ error: result.error, code: result.code }, 400);
-    }
-    return c.json({ ok: true, order: result.order, purchase: result.purchase });
+    await requireAuth(c);
+    return c.json({ error: 'Internal payments are disabled. Contact the seller directly.' }, 410);
   });
 
   app.post('/api/users/me/orders/:orderId/refund', async (c) => {

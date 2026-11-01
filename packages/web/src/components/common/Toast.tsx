@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             role="status"
             className={cn(
-              'animate-fade-in-up pointer-events-auto rounded-lg border px-4 py-3 text-sm shadow-lg',
+              'animate-fade-in-up pointer-events-auto rounded-xl border px-4 py-3 text-sm font-medium shadow-lift backdrop-blur-sm',
               TOAST_STYLES[t.type],
             )}
           >

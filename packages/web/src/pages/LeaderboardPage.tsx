@@ -15,7 +15,7 @@ function SkeletonRows() {
   return (
     <div className="space-y-3">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
+        <div key={i} className="flex items-center gap-4 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-4">
           <Skeleton className="h-8 w-8" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-3 w-1/3" />
@@ -52,7 +52,7 @@ export function LeaderboardPage() {
       />
       <div className="text-center">
         <FaTrophy className="mx-auto h-10 w-10 text-warning" />
-        <h1 className="mt-3 text-2xl font-bold">{isSales ? 'Top sellers' : 'Community leaderboard'}</h1>
+        <h1 className="mt-3 font-display text-3xl">{isSales ? 'Top sellers' : 'Community leaderboard'}</h1>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           {isSales
             ? 'The students earning the most from their shared work — ranked by number of sales, with total revenue alongside.'
@@ -78,7 +78,7 @@ export function LeaderboardPage() {
           <SkeletonRows />
         </div>
       ) : entries.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-border bg-surface py-16 text-center text-sm text-muted-foreground">
+        <div className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft py-16 text-center text-sm text-muted-foreground">
           {isSales ? (
             <>
               No sales yet. Price a resource and start earning!
@@ -103,7 +103,7 @@ export function LeaderboardPage() {
               <div
                 key={entry.user.id}
                 className={cn(
-                  'animate-fade-in-up rounded-lg border border-border bg-surface p-6 text-center',
+                  'animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6 text-center',
                   i === 0 && 'border-warning bg-gradient-to-b from-warning/10 to-transparent',
                 )}
                 style={{ animationDelay: `${i * 60}ms` }}
@@ -139,7 +139,7 @@ export function LeaderboardPage() {
           </div>
 
           {/* Table */}
-          <div className="mt-8 overflow-hidden rounded-lg border border-border bg-surface">
+          <div className="mt-8 overflow-hidden rounded-2xl border border-border/75 bg-surface/75 shadow-soft">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface-2 text-xs uppercase tracking-wide text-muted-foreground">

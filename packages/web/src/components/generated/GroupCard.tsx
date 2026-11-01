@@ -14,13 +14,13 @@ export function GroupCard({ group, index = 0 }: GroupCardProps) {
   return (
     <div
       className={cn(
-        'card-hover group animate-fade-in-up flex flex-col rounded-lg border border-border bg-surface p-5 hover:border-accent',
+        'card-hover group flex animate-fade-in-up flex-col rounded-2xl border border-border/75 bg-surface/75 p-5 shadow-soft',
       )}
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <div className="flex items-start justify-between gap-2">
         <Link to={`/groups/${group.id}`} className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-subtle text-accent">
             <FaUsers className="h-5 w-5" aria-hidden />
           </span>
           <div className="min-w-0">

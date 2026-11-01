@@ -1,5 +1,18 @@
 # SCIEHub 设计规范
 
+## 2026 UI refresh — “Academic Atelier”
+
+当前界面已从 GitHub 深色复刻升级为学术编辑风（Academic Atelier）：
+
+- **字体**：Fraunces（展示标题）+ Plus Jakarta Sans（正文/UI）
+- **深色主题**：背景 `#07100e`、表面 `#0d1715`、边框 `#243a35`、薄荷强调 `#5eead4`、琥珀付费色 `#fbbf24`
+- **浅色主题**：羊皮纸背景 `#f7f4ec`、表面 `#fffdf7`、边框 `#dcd3c1`、深青强调 `#0f766e`
+- **组件语言**：`section-shell` / `panel` / `panel-muted` / `eyebrow` / `link-arrow` / `card-hover`
+- **布局**：浮动圆角导航、编辑式 Hero、免费/付费双货架、三列资源网格
+- **原则**：hover 只改变颜色/边框/阴影，不做位移；图标统一 react-icons；正文对比度 ≥ 4.5:1；支持 reduced motion
+
+以下章节保留原始设计推导，作为历史参考；实际 token 以 `packages/web/src/index.css` 与 `tailwind.config.js` 为准。
+
 ## 0. 设计依据
 
 - 视觉方向来源：品牌个性推导（参考网站 GitHub 抓取失败，无可用视觉材料，降级为推导路径）

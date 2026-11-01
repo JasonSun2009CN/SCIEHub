@@ -56,7 +56,7 @@ function StatTile({
   tone?: 'success' | 'error' | 'muted';
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-4">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="text-accent">{icon}</span>
         {label}
@@ -106,7 +106,7 @@ export function WalletPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
       <PageMeta title="Wallet" description="Your balance, earnings and spending on SCIEHub." />
-      <h1 className="flex items-center gap-2 text-2xl font-bold">
+      <h1 className="flex items-center gap-2 font-display text-3xl">
         <FaWallet className="h-6 w-6 text-accent" aria-hidden />
         Wallet
       </h1>
@@ -168,7 +168,7 @@ export function WalletPage() {
       </div>
 
       {/* Transaction history */}
-      <div className="mt-8 rounded-lg border border-border bg-surface">
+      <div className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <h2 className="font-semibold">Transaction history</h2>
           <Select

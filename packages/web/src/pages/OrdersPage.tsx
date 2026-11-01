@@ -113,7 +113,7 @@ export function OrdersPage() {
       <PageMeta title="Orders" description="Your purchases and sales on SCIEHub." />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <h1 className="flex items-center gap-2 font-display text-3xl">
             <FaFileInvoice className="h-6 w-6 text-accent" aria-hidden />
             Orders
           </h1>
@@ -163,7 +163,7 @@ export function OrdersPage() {
               ))}
             </div>
           ) : orders.length === 0 ? (
-            <div className="rounded-lg border border-border bg-surface py-16 text-center">
+            <div className="rounded-2xl border border-border/75 bg-surface/75 shadow-soft py-16 text-center">
               <FaCircleNotch className="mx-auto h-8 w-8 text-muted-foreground" />
               <p className="mt-3 font-medium">No {role === 'buyer' ? 'purchases' : 'sales'} yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -190,7 +190,7 @@ export function OrdersPage() {
                 return (
                   <li
                     key={order.id}
-                    className="animate-fade-in-up flex flex-wrap items-center gap-4 rounded-lg border border-border bg-surface p-4"
+                    className="animate-fade-in-up flex flex-wrap items-center gap-4 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-4"
                   >
                     <UserAvatar
                       nickname={counterpart.nickname}

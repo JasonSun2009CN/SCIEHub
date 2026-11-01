@@ -4,10 +4,8 @@ import {
   CURRENCIES,
   LEVELS,
   MAX_FILE_PRICE,
-  PLATFORM_FEE_RATE,
   RESOURCE_TYPES,
   formatBytes,
-  formatPrice,
   type Currency,
   type EducationLevel,
   type PricingType,
@@ -18,16 +16,15 @@ import { requireAuth } from '../auth.js';
 import {
   addFileToRepo,
   canUserReviewRepo,
-  createOrder,
   createRepo,
   createRepoComment,
   createReview,
   deleteRepo,
   deleteReview,
-  getOrderById,
   getRepoById,
   getRepoFileById,
   getReviewById,
+  getUserById,
   groupRole,
   hasUserPurchasedRepo,
   incrementFileDownload,
@@ -37,7 +34,6 @@ import {
   listRepoFiles,
   listRepoReviews,
   listRepos,
-  payOrderWithWallet,
   shareRepoToGroup,
   toggleFavoriteRepo,
   unshareRepoFromGroup,
@@ -169,6 +165,7 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
       pricingType?: PricingType;
       price?: number;
       currency?: Currency;
+      isAnonymous?: boolean;
       previewImageUrl?: string;
     }>(c);
     const name = body.name?.trim() ?? '';
@@ -182,6 +179,17 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
     if (!classification.ok) return c.json({ error: classification.error }, 400);
     const pricing = validatePricing(body);
     if (!pricing.ok) return c.json({ error: pricing.error }, 400);
+    if (body.isAnonymous && (body.pricingType ?? 'free') === 'paid') {
+      return c.json(
+        { error: 'Anonymous publishing is for free resources. Add a username before setting a price.' },
+        400,
+      );
+    }
+    const account = await getUserById(authUser.id);
+    const permission = (body.pricingType ?? 'free') === 'paid' ? 'canPublishPaid' : 'canPublishFree';
+    if (!account?.[permission]) {
+      return c.json({ error: 'Publishing is disabled for this account' }, 403);
+    }
     const tags = (body.tags ?? '')
       .split(',')
       .map((tag) => tag.trim())
@@ -198,6 +206,7 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
       pricingType: body.pricingType ?? 'free',
       price: body.pricingType === 'paid' ? Number(body.price) : 0,
       currency: (body.currency ?? 'CNY') as Currency,
+      isAnonymous: Boolean(body.isAnonymous),
       previewImageUrl: body.previewImageUrl?.trim() || undefined,
     });
     return c.json({ repo }, 201);
@@ -221,6 +230,7 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
       pricingType?: PricingType;
       price?: number;
       currency?: Currency;
+      isAnonymous?: boolean;
       previewImageUrl?: string | null;
     }>(c);
     if (
@@ -241,6 +251,19 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
       if (!classification.ok) return c.json({ error: classification.error }, 400);
       patchClassification.levelId = classification.levelId;
       patchClassification.resourceType = classification.resourceType;
+    }
+    const nextPricingType = body.pricingType ?? repo.pricingType;
+    const nextAnonymous = body.isAnonymous ?? repo.isAnonymous;
+    if (nextAnonymous && nextPricingType === 'paid') {
+      return c.json(
+        { error: 'Anonymous publishing is for free resources. Turn off anonymous before setting a price.' },
+        400,
+      );
+    }
+    const account = await getUserById(authUser.id);
+    const permission = nextPricingType === 'paid' ? 'canPublishPaid' : 'canPublishFree';
+    if (!account?.[permission]) {
+      return c.json({ error: 'Publishing is disabled for this account' }, 403);
     }
     const patchPricing: { pricingType?: PricingType; price?: number; currency?: Currency } = {};
     if (body.pricingType !== undefined) {
@@ -268,6 +291,7 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
       categoryId: body.categoryId,
       ...patchClassification,
       tags,
+      isAnonymous: body.isAnonymous,
       ...patchPricing,
       previewImageUrl:
         body.previewImageUrl !== undefined
@@ -294,39 +318,13 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
   // ---- Purchase / Checkout -----------------------------------------------
 
   app.post('/api/repos/:id/checkout', async (c) => {
-    const authUser = await requireAuth(c);
-    const { id } = c.req.param();
-    const repo = await getRepoById(id, null, false);
-    if (!repo) return c.json({ error: 'Repository not found' }, 404);
-    if (repo.ownerId === authUser.id) {
-      return c.json({ error: 'You cannot purchase your own repository' }, 400);
-    }
-    if (repo.pricingType === 'free') {
-      return c.json({ error: 'This repository is free — no checkout required' }, 400);
-    }
-    if (await hasUserPurchasedRepo(authUser.id, id)) {
-      return c.json({ error: 'You have already purchased this repository' }, 400);
-    }
-    const platformFee = repo.price * PLATFORM_FEE_RATE;
-    const order = await createOrder({
-      buyerId: authUser.id,
-      sellerId: repo.ownerId,
-      repoId: id,
-      repoName: repo.name,
-      repoOwnerId: repo.ownerId,
-      quantity: 1,
-      unitPrice: repo.price,
-      currency: repo.currency,
-      platformFee,
-      sellerEarning: repo.price - platformFee,
-    });
+    await requireAuth(c);
     return c.json(
       {
-        order,
-        formattedTotal: formatPrice(order.totalAmount, order.currency),
-        platformFeeRate: PLATFORM_FEE_RATE,
+        error:
+          'Internal checkout is disabled. Send a purchase request to contact the seller and arrange payment off-platform.',
       },
-      201,
+      410,
     );
   });
 
@@ -351,6 +349,11 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
     if (!repo) return c.json({ error: 'Repository not found' }, 404);
     if (repo.ownerId !== authUser.id) {
       return c.json({ error: 'Only the owner can add files' }, 403);
+    }
+    const account = await getUserById(authUser.id);
+    const permission = repo.pricingType === 'paid' ? 'canPublishPaid' : 'canPublishFree';
+    if (!account?.[permission]) {
+      return c.json({ error: 'Publishing is disabled for this account' }, 403);
     }
 
     const form = await c.req.formData();
@@ -575,26 +578,7 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
   // ---- Pay order directly (convenience endpoint under repo) -------------
 
   app.post('/api/orders/:orderId/pay', async (c) => {
-    const authUser = await requireAuth(c);
-    const { orderId } = c.req.param();
-    const order = await getOrderById(orderId);
-    if (!order) return c.json({ error: 'Order not found' }, 404);
-    if (order.buyerId !== authUser.id) {
-      return c.json({ error: 'Only the buyer can pay this order' }, 403);
-    }
-    if (order.status !== 'pending') {
-      return c.json({ error: `Order is already ${order.status}` }, 400);
-    }
-    const result = await payOrderWithWallet(orderId, authUser.id);
-    if (!result.success) {
-      return c.json({ error: result.error, code: result.code }, 400);
-    }
-    return c.json({
-      order: result.order,
-      purchase: result.purchase,
-      formattedTotal: result.order
-        ? formatPrice(result.order.totalAmount, result.order.currency)
-        : undefined,
-    });
+    await requireAuth(c);
+    return c.json({ error: 'Internal payments are disabled. Contact the seller directly.' }, 410);
   });
 }

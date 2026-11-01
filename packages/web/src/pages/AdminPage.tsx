@@ -24,7 +24,7 @@ export function AdminPage() {
           <FaShieldAlt className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-2xl font-bold">Admin console</h1>
+          <h1 className="font-display text-3xl">Admin console</h1>
           <p className="text-sm text-muted-foreground">Moderate content, reports and users.</p>
         </div>
       </div>
