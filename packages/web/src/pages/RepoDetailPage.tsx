@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/dialog';
 import { UserAvatar } from '@/components/generated/UserAvatar';
 import { FileTypeIcon } from '@/components/generated/FileTypeIcon';
+import { TagInput } from '@/components/common/TagInput';
 import { ReportDialog } from '@/components/common/ReportDialog';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
@@ -88,7 +89,7 @@ export function RepoDetailPage() {
   const [editLevel, setEditLevel] = useState<EducationLevel>('other');
   const [editCategory, setEditCategory] = useState('');
   const [editResourceType, setEditResourceType] = useState<ResourceType>('notes');
-  const [editTags, setEditTags] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [editPricingType, setEditPricingType] = useState<PricingType>('free');
   const [editPrice, setEditPrice] = useState('');
   const [editCurrency, setEditCurrency] = useState<Currency>('CNY');
@@ -188,7 +189,7 @@ export function RepoDetailPage() {
           levelId: editLevel,
           categoryId: editCategory,
           resourceType: editResourceType,
-          tags: editTags,
+          tags: editTags.join(','),
           pricingType: editPricingType,
           price: editPricingType === 'paid' ? Number(editPrice) : 0,
           currency: editCurrency,
@@ -320,7 +321,7 @@ export function RepoDetailPage() {
     setEditLevel(repo.levelId);
     setEditCategory(repo.categoryId);
     setEditResourceType(repo.resourceType);
-    setEditTags(repo.tags.join(', '));
+    setEditTags(repo.tags);
     setEditPricingType(repo.pricingType);
     setEditPrice(repo.pricingType === 'paid' ? String(repo.price) : '');
     setEditCurrency(repo.currency);
@@ -1085,11 +1086,11 @@ export function RepoDetailPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-repo-tags">Tags</Label>
-                <Input
+                <TagInput
                   id="edit-repo-tags"
                   value={editTags}
-                  onChange={(e) => setEditTags(e.target.value)}
-                  placeholder="waves, trig, exam — comma separated"
+                  onChange={setEditTags}
+                  placeholder="Type a tag and press Enter"
                 />
               </div>
             </div>

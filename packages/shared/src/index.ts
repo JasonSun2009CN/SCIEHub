@@ -2,6 +2,14 @@
 
 export type FileType = 'pdf' | 'doc' | 'ppt' | 'image' | 'code' | 'audio' | 'video' | 'archive' | 'other';
 export type PricingType = 'free' | 'paid';
+
+/** Only verified school addresses may register: s24427.sun@stu.scie.com.cn */
+export const SCHOOL_EMAIL_DOMAIN = 'stu.scie.com.cn';
+export const SCHOOL_EMAIL_PATTERN = /^s\d{3,10}\.[a-z][a-z'-]*@stu\.scie\.com\.cn$/i;
+
+export function isValidSchoolEmail(email: string): boolean {
+  return SCHOOL_EMAIL_PATTERN.test(email.trim().toLowerCase());
+}
 export type EducationLevel = 'ig' | 'as' | 'a-level' | 'ib' | 'ap' | 'other';
 export type ResourceType = 'notes' | 'practice' | 'past-paper' | 'other';
 export type Currency = 'CNY' | 'USD';

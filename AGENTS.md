@@ -48,6 +48,7 @@ npm run db:migrate:remote          # apply migrations to the real D1 database
 
 ## Auth / config / deployment
 
+- Registration is restricted to school emails matching `s\d+\.<family>@stu.scie.com.cn` (`isValidSchoolEmail` in shared). Keep client and server validation in sync; login stays available for legacy accounts.
 - JWT bearer token is stored in `localStorage`. The Worker secret is `JWT_SECRET` (`wrangler secret put JWT_SECRET`); local dev falls back to a dev placeholder when unset.
 - The app does **not** load `.env`; use `.dev.vars` locally or Cloudflare secrets/vars. `.dev.vars` and `.wrangler/` are gitignored.
 - Common env: `JWT_SECRET`, `ADMIN_EMAILS`, `SCIEHUB_MAX_FILE_MB` (default 50), `SCIEHUB_MAX_FILES` (default 8), `SCIEHUB_ALLOW_SELF_TOPUP=1` (sandbox only).

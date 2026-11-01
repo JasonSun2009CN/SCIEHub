@@ -32,6 +32,7 @@ A free-first **study-resource library and community** for international high sch
 - **Study groups** — join groups by **requesting membership**; the group creator approves or rejects each request. Groups collect repositories shared into them.
 - **Sharing** — a repo owner can share a repository into any group they belong to (and remove it again).
 - **Community guidelines** — `/conduct` sets the rules; **Report** buttons on every repository and comment store reports for review.
+- **School email only** — registration requires a school address in the format `s24427.sun@stu.scie.com.cn` (`s` + student ID + `.` + family name + fixed domain). External emails are rejected to keep the community inside the school.
 - **Account safety** — every sign-in is logged (IP + browser); users can review their login history, **sign out all devices**, **deactivate** their account (deleted after 30 days unless they sign back in) or **permanently delete** it with their password.
 - **Comments & favorites** per repository, per-file download counters, drag-and-drop multi-file uploads with progress.
 - **Dark/light themes** (dark default) driven by CSS-variable tokens.

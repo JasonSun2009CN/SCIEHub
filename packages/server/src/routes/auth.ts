@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { AVATAR_COLORS, type AuthResponse } from '@sciehub/shared';
+import { AVATAR_COLORS, isValidSchoolEmail, type AuthResponse } from '@sciehub/shared';
 import {
   clearDeactivated,
   createUser,
@@ -53,6 +53,15 @@ export function registerAuthRoutes(app: Hono<AppEnv>): void {
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       return c.json({ error: 'Please enter a valid email address' }, 400);
+    }
+    if (!isValidSchoolEmail(email)) {
+      return c.json(
+        {
+          error:
+            'Use your school email in the format s24427.sun@stu.scie.com.cn. External emails cannot register.',
+        },
+        400,
+      );
     }
     if (password.length < 6) {
       return c.json({ error: 'Password must be at least 6 characters' }, 400);

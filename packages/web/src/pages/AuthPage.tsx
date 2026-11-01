@@ -12,6 +12,7 @@ import {
   FaSpinner,
   FaUser,
 } from 'react-icons/fa';
+import { isValidSchoolEmail } from '@sciehub/shared';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,8 +99,8 @@ function Field({
 
 const BENEFITS = [
   { Icon: FaBookOpen, text: 'A free shelf with notes, practice and past papers.' },
-  { Icon: FaCoins, text: 'Publish paid packs and keep 90% of every sale.' },
-  { Icon: FaCheck, text: 'One wallet for purchases, earnings and refunds.' },
+  { Icon: FaCoins, text: 'Publish under your username or anonymously.' },
+  { Icon: FaCheck, text: 'A shared community for questions and study tips.' },
 ];
 
 export function AuthPage() {
@@ -146,6 +147,12 @@ export function AuthPage() {
     e.preventDefault();
     setError('');
     setEmailTaken(false);
+    if (!isValidSchoolEmail(regEmail)) {
+      setError(
+        'Use your school email in the format s24427.sun@stu.scie.com.cn. External emails cannot register.',
+      );
+      return;
+    }
     setRegBusy(true);
     try {
       await register({
@@ -190,8 +197,8 @@ export function AuthPage() {
               Your next grade starts with the right notes.
             </h1>
             <p className="mt-5 max-w-sm text-sm leading-7 text-muted-foreground">
-              Join a marketplace built around IGCSE, AS/A Level, IB and AP — where students share
-              what they know and get paid for the work that works.
+              Join a free-first study library built around IGCSE, AS/A Level, IB and AP — share
+              notes, ask in the Commons, and contact sellers directly for optional paid packs.
             </p>
           </div>
           <ul className="relative mt-10 space-y-3">
@@ -233,12 +240,12 @@ export function AuthPage() {
                 <form onSubmit={onLogin} className="mt-4 space-y-4">
                   <Field
                     icon={<FaEnvelope className="h-4 w-4" />}
-                    label="Email"
+                    label="School email"
                     id="login-email"
                     type="email"
                     value={loginEmail}
                     onChange={setLoginEmail}
-                    placeholder="you@example.com"
+                    placeholder="s24427.sun@stu.scie.com.cn"
                     autoComplete="email"
                   />
                   <Field
@@ -289,14 +296,19 @@ export function AuthPage() {
                   />
                   <Field
                     icon={<FaEnvelope className="h-4 w-4" />}
-                    label="Email"
+                    label="School email"
                     id="reg-email"
                     type="email"
                     value={regEmail}
                     onChange={setRegEmail}
-                    placeholder="you@example.com"
+                    placeholder="s24427.sun@stu.scie.com.cn"
                     autoComplete="email"
                   />
+                  <p className="-mt-2 text-[11px] leading-5 text-muted-foreground">
+                    School email only: <span className="font-medium">s</span> + student ID +{' '}
+                    <span className="font-medium">.familyname</span> @stu.scie.com.cn. External
+                    emails are not accepted.
+                  </p>
                   <Field
                     icon={<FaLock className="h-4 w-4" />}
                     label="Password"

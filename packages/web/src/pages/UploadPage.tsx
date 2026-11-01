@@ -37,6 +37,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileTypeIcon } from '@/components/generated/FileTypeIcon';
+import { TagInput } from '@/components/common/TagInput';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { cn } from '@/lib/utils';
@@ -68,7 +69,7 @@ export function UploadPage() {
   const [levelId, setLevelId] = useState<EducationLevel | ''>('');
   const [categoryId, setCategoryId] = useState('');
   const [resourceType, setResourceType] = useState<ResourceType | ''>('');
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [shareGroupIds, setShareGroupIds] = useState<string[]>([]);
   const [pricingType, setPricingType] = useState<PricingType>('free');
   const [price, setPrice] = useState<string>('9.9');
@@ -156,7 +157,7 @@ export function UploadPage() {
             levelId,
             categoryId,
             resourceType,
-            tags,
+            tags: tags.join(','),
             pricingType,
             price: pricingType === 'paid' ? Number(price) : 0,
             currency,
@@ -208,14 +209,15 @@ export function UploadPage() {
     }
   };
 
+  const availableGroups = useMemo(() => myGroups?.items ?? [], [myGroups]);
+  const availableRepos = useMemo(() => myRepos?.items ?? [], [myRepos]);
+
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace state={{ from: '/upload' }} />;
 
   const doneCount = files.filter((f) => f.status === 'done').length;
   const totalBytes = files.reduce((sum, f) => sum + f.file.size, 0);
   const uploadedBytes = files.reduce((sum, f) => sum + Math.round((f.file.size * f.progress) / 100), 0);
-  const availableGroups = useMemo(() => myGroups?.items ?? [], [myGroups]);
-  const availableRepos = useMemo(() => myRepos?.items ?? [], [myRepos]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
@@ -305,7 +307,15 @@ export function UploadPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="repo-tags">Tags</Label>
-              <Input id="repo-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="waves, trig, exam" />
+              <TagInput
+                id="repo-tags"
+                value={tags}
+                onChange={setTags}
+                placeholder="Type a tag and press Enter"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Press Enter or comma to create a tag. Up to 8 tags.
+              </p>
             </div>
           </div>
 
