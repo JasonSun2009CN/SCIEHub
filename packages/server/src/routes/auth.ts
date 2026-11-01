@@ -1,5 +1,4 @@
-import type { FastifyInstance } from 'fastify';
-import bcrypt from 'bcryptjs';
+import type { Hono } from 'hono';
 import { AVATAR_COLORS, type AuthResponse } from '@sciehub/shared';
 import {
   clearDeactivated,
@@ -18,136 +17,150 @@ import {
   updateUserProfile,
 } from '../db.js';
 import { requireAuth, signToken } from '../auth.js';
-import { config } from '../config.js';
+import { getConfig } from '../runtime.js';
+import { hashPassword, verifyPassword } from '../password.js';
+import { clientIp, readJson, userAgent } from '../http.js';
+import type { AppEnv } from '../types.js';
 
 const GRACE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 /** Emails listed in ADMIN_EMAILS are granted admin on their first sign-in. */
-function promoteIfAdmin(userId: string, email: string): void {
-  if (config.adminEmails.includes(email.trim().toLowerCase())) setUserAdmin(userId, true);
+async function promoteIfAdmin(userId: string, email: string): Promise<void> {
+  if (getConfig().adminEmails.includes(email.trim().toLowerCase())) {
+    await setUserAdmin(userId, true);
+  }
 }
 
-export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
-  app.post('/api/auth/register', async (req, reply) => {
-    const body = (req.body ?? {}) as {
+export function registerAuthRoutes(app: Hono<AppEnv>): void {
+  app.post('/api/auth/register', async (c) => {
+    const body = await readJson<{
       username?: string;
       email?: string;
       nickname?: string;
       password?: string;
-    };
+    }>(c);
     const username = body.username?.trim() ?? '';
     const email = body.email?.trim().toLowerCase() ?? '';
     const password = body.password ?? '';
-    const ip = req.ip ?? null;
-    const userAgent = (req.headers['user-agent'] as string | undefined) ?? null;
+    const ip = clientIp(c) || null;
+    const agent = userAgent(c) || null;
 
     if (!username || !email || !password) {
-      return reply.code(400).send({ error: 'Username, email and password are required' });
+      return c.json({ error: 'Username, email and password are required' }, 400);
     }
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-      return reply.code(400).send({ error: 'Username must be 3–20 chars (letters, digits, underscore)' });
+      return c.json({ error: 'Username must be 3–20 chars (letters, digits, underscore)' }, 400);
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) {
-      return reply.code(400).send({ error: 'Please enter a valid email address' });
+      return c.json({ error: 'Please enter a valid email address' }, 400);
     }
     if (password.length < 6) {
-      return reply.code(400).send({ error: 'Password must be at least 6 characters' });
+      return c.json({ error: 'Password must be at least 6 characters' }, 400);
     }
-    if (getUserByEmail(email)) {
-      return reply.code(409).send({ error: 'An account with this email already exists' });
+    if (await getUserByEmail(email)) {
+      return c.json({ error: 'An account with this email already exists' }, 409);
     }
-    if (getUserByUsername(username)) {
-      return reply.code(409).send({ error: 'This username is already taken' });
+    if (await getUserByUsername(username)) {
+      return c.json({ error: 'This username is already taken' }, 409);
     }
 
     // The very first registered user becomes the site admin (no password ever
-    // lives in the codebase). ADMIN_EMAILS and promote-admin remain as backups.
-    const isFirstUser = getUserCount() === 0;
-    const user = createUser({
+    // lives in the codebase). ADMIN_EMAILS remains as a backup.
+    const isFirstUser = (await getUserCount()) === 0;
+    const user = await createUser({
       username,
       email,
       nickname: body.nickname?.trim() || username,
-      passwordHash: bcrypt.hashSync(password, 10),
+      passwordHash: await hashPassword(password),
       avatarUrl: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
     });
-    if (isFirstUser) setUserAdmin(user.id, true);
-    promoteIfAdmin(user.id, email);
-    logLogin({ userId: user.id, email, success: true, ip, userAgent });
+    if (isFirstUser) await setUserAdmin(user.id, true);
+    await promoteIfAdmin(user.id, email);
+    await logLogin({ userId: user.id, email, success: true, ip, userAgent: agent });
 
-    const response: AuthResponse = { token: signToken(user, getTokenVersion(user.id)), user: getUserById(user.id)! };
-    return response;
+    const response: AuthResponse = {
+      token: await signToken(user, await getTokenVersion(user.id)),
+      user: (await getUserById(user.id))!,
+    };
+    return c.json(response);
   });
 
-  app.post('/api/auth/login', async (req, reply) => {
-    const body = (req.body ?? {}) as { email?: string; password?: string };
+  app.post('/api/auth/login', async (c) => {
+    const body = await readJson<{ email?: string; password?: string }>(c);
     const email = body.email?.trim().toLowerCase() ?? '';
     const password = body.password ?? '';
-    const ip = req.ip ?? null;
-    const userAgent = (req.headers['user-agent'] as string | undefined) ?? null;
+    const ip = clientIp(c) || null;
+    const agent = userAgent(c) || null;
     if (!email || !password) {
-      return reply.code(400).send({ error: 'Email and password are required' });
+      return c.json({ error: 'Email and password are required' }, 400);
     }
 
-    const user = getUserByEmail(email);
-    const hash = user ? getUserPasswordHash(user.id) : null;
-    if (!user || !hash || !bcrypt.compareSync(password, hash)) {
-      logLogin({ userId: user?.id ?? null, email, success: false, ip, userAgent });
-      return reply.code(401).send({ error: 'Invalid email or password' });
+    const user = await getUserByEmail(email);
+    const hash = user ? await getUserPasswordHash(user.id) : null;
+    if (!user || !hash || !(await verifyPassword(password, hash))) {
+      await logLogin({ userId: user?.id ?? null, email, success: false, ip, userAgent: agent });
+      return c.json({ error: 'Invalid email or password' }, 401);
     }
 
     if (user.isSuspended) {
-      logLogin({ userId: user.id, email, success: false, ip, userAgent });
-      return reply.code(403).send({ error: 'This account has been suspended. Contact the admin at jasonsun2009@yeah.net.' });
+      await logLogin({ userId: user.id, email, success: false, ip, userAgent: agent });
+      return c.json(
+        { error: 'This account has been suspended. Contact the admin at jasonsun2009@yeah.net.' },
+        403,
+      );
     }
 
     // Deactivated account: logging back in restores it (unless the 30-day grace expired).
-    const deactivatedAt = getDeactivatedAt(user.id);
+    const deactivatedAt = await getDeactivatedAt(user.id);
     if (deactivatedAt) {
       if (Date.now() - new Date(deactivatedAt).getTime() > GRACE_MS) {
-        deleteUserWithFiles(user.id);
-        return reply.code(401).send({ error: 'This account was deactivated over 30 days ago and has been deleted.' });
+        await deleteUserWithFiles(user.id);
+        return c.json(
+          { error: 'This account was deactivated over 30 days ago and has been deleted.' },
+          401,
+        );
       }
-      clearDeactivated(user.id);
+      await clearDeactivated(user.id);
     }
 
-    promoteIfAdmin(user.id, email);
-    logLogin({ userId: user.id, email, success: true, ip, userAgent });
-    const response: AuthResponse = { token: signToken(user, getTokenVersion(user.id)), user: getUserById(user.id)! };
-    return response;
+    await promoteIfAdmin(user.id, email);
+    await logLogin({ userId: user.id, email, success: true, ip, userAgent: agent });
+    const response: AuthResponse = {
+      token: await signToken(user, await getTokenVersion(user.id)),
+      user: (await getUserById(user.id))!,
+    };
+    return c.json(response);
   });
 
-  app.get('/api/auth/me', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const user = getUserById(authUser.id);
-    if (!user) return reply.code(401).send({ error: 'User no longer exists' });
-    return { user };
+  app.get('/api/auth/me', async (c) => {
+    const authUser = await requireAuth(c);
+    const user = await getUserById(authUser.id);
+    if (!user) return c.json({ error: 'User no longer exists' }, 401);
+    return c.json({ user });
   });
 
-  app.put('/api/users/me', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const body = (req.body ?? {}) as { nickname?: string; bio?: string; avatarUrl?: string };
-    const user = updateUserProfile(authUser.id, {
+  app.put('/api/users/me', async (c) => {
+    const authUser = await requireAuth(c);
+    const body = await readJson<{ nickname?: string; bio?: string; avatarUrl?: string }>(c);
+    const user = await updateUserProfile(authUser.id, {
       nickname: typeof body.nickname === 'string' ? body.nickname : undefined,
       bio: typeof body.bio === 'string' ? body.bio : undefined,
       avatarUrl: typeof body.avatarUrl === 'string' ? body.avatarUrl : undefined,
     });
-    return { user };
+    return c.json({ user });
   });
 
-  app.put('/api/users/me/password', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const body = (req.body ?? {}) as { oldPassword?: string; newPassword?: string };
-    const hash = getUserPasswordHash(authUser.id)!;
-    if (!bcrypt.compareSync(body.oldPassword ?? '', hash)) {
-      return reply.code(400).send({ error: 'Current password is incorrect' });
+  app.put('/api/users/me/password', async (c) => {
+    const authUser = await requireAuth(c);
+    const body = await readJson<{ oldPassword?: string; newPassword?: string }>(c);
+    const hash = await getUserPasswordHash(authUser.id);
+    if (!hash || !(await verifyPassword(body.oldPassword ?? '', hash))) {
+      return c.json({ error: 'Current password is incorrect' }, 400);
     }
     if (!body.newPassword || body.newPassword.length < 6) {
-      return reply.code(400).send({ error: 'New password must be at least 6 characters' });
+      return c.json({ error: 'New password must be at least 6 characters' }, 400);
     }
-    setUserPassword(authUser.id, bcrypt.hashSync(body.newPassword, 10));
-    return { ok: true };
+    await setUserPassword(authUser.id, await hashPassword(body.newPassword));
+    return c.json({ ok: true });
   });
 }

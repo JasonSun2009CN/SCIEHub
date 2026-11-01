@@ -24,14 +24,18 @@ import {
 import {
   CATEGORIES,
   CURRENCIES,
+  LEVELS,
   MAX_FILE_PRICE,
   PLATFORM_FEE_RATE,
+  RESOURCE_TYPES,
   formatBytes,
   formatPrice,
   type Comment,
   type Currency,
+  type EducationLevel,
   type Group,
   type PricingType,
+  type ResourceType,
   type RepoFile,
   type Repository,
   type Review,
@@ -81,7 +85,9 @@ export function RepoDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editLevel, setEditLevel] = useState<EducationLevel>('other');
   const [editCategory, setEditCategory] = useState('');
+  const [editResourceType, setEditResourceType] = useState<ResourceType>('notes');
   const [editTags, setEditTags] = useState('');
   const [editPricingType, setEditPricingType] = useState<PricingType>('free');
   const [editPrice, setEditPrice] = useState('');
@@ -170,7 +176,9 @@ export function RepoDetailPage() {
         json: {
           name: editName.trim(),
           description: editDesc.trim(),
+          levelId: editLevel,
           categoryId: editCategory,
+          resourceType: editResourceType,
           tags: editTags,
           pricingType: editPricingType,
           price: editPricingType === 'paid' ? Number(editPrice) : 0,
@@ -283,7 +291,9 @@ export function RepoDetailPage() {
   const openEdit = () => {
     setEditName(repo.name);
     setEditDesc(repo.description);
+    setEditLevel(repo.levelId);
     setEditCategory(repo.categoryId);
+    setEditResourceType(repo.resourceType);
     setEditTags(repo.tags.join(', '));
     setEditPricingType(repo.pricingType);
     setEditPrice(repo.pricingType === 'paid' ? String(repo.price) : '');
@@ -295,8 +305,8 @@ export function RepoDetailPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <PageMeta title={repo.name} description={repo.description} />
-      <Link to="/feed" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <FaArrowLeft className="h-3.5 w-3.5" /> Back to feed
+      <Link to="/marketplace" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <FaArrowLeft className="h-3.5 w-3.5" /> Back to marketplace
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-12">
@@ -310,7 +320,9 @@ export function RepoDetailPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge>{repo.categoryName}</Badge>
+                  <Badge>{repo.levelName}</Badge>
+                  <Badge variant="secondary">{repo.categoryName}</Badge>
+                  <Badge variant="outline">{repo.resourceTypeName}</Badge>
                   {repo.pricingType === 'free' ? (
                     <Badge variant="success">Free</Badge>
                   ) : (
@@ -955,7 +967,7 @@ export function RepoDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit repository</DialogTitle>
-            <DialogDescription>Update the name, description, category, pricing or tags.</DialogDescription>
+            <DialogDescription>Update the name, level, subject, resource type, pricing or tags.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -977,27 +989,55 @@ export function RepoDetailPage() {
                 placeholder="What does this repository cover?"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select value={editCategory} onValueChange={setEditCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-repo-tags">Tags</Label>
-              <Input
-                id="edit-repo-tags"
-                value={editTags}
-                onChange={(e) => setEditTags(e.target.value)}
-                placeholder="math, notes, exam — comma separated"
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Level</Label>
+                <Select value={editLevel} onValueChange={(v) => setEditLevel(v as EducationLevel)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LEVELS.map((level) => (
+                      <SelectItem key={level.id} value={level.id}>{level.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Subject</Label>
+                <Select value={editCategory} onValueChange={setEditCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Resource type</Label>
+                <Select value={editResourceType} onValueChange={(v) => setEditResourceType(v as ResourceType)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a resource type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RESOURCE_TYPES.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-repo-tags">Tags</Label>
+                <Input
+                  id="edit-repo-tags"
+                  value={editTags}
+                  onChange={(e) => setEditTags(e.target.value)}
+                  placeholder="waves, trig, exam — comma separated"
+                />
+              </div>
             </div>
 
             {/* Pricing */}

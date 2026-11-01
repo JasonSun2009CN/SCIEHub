@@ -2,6 +2,8 @@
 
 export type FileType = 'pdf' | 'doc' | 'ppt' | 'image' | 'code' | 'audio' | 'video' | 'archive' | 'other';
 export type PricingType = 'free' | 'paid';
+export type EducationLevel = 'ig' | 'as' | 'a-level' | 'ib' | 'ap' | 'other';
+export type ResourceType = 'notes' | 'practice' | 'past-paper' | 'other';
 export type Currency = 'CNY' | 'USD';
 export type OrderStatus = 'pending' | 'paid' | 'refunded' | 'cancelled';
 export type ReviewRating = 1 | 2 | 3 | 4 | 5;
@@ -35,6 +37,10 @@ export interface Repository {
   owner: User;
   categoryId: string;
   categoryName: string;
+  levelId: EducationLevel;
+  levelName: string;
+  resourceType: ResourceType;
+  resourceTypeName: string;
   tags: string[];
   fileCount: number;
   totalBytes: number;
@@ -169,21 +175,61 @@ export interface Category {
   name: string;
 }
 
+/** Curriculum / qualification level, kept separate from the subject. */
+export interface Level {
+  id: EducationLevel;
+  name: string;
+  shortName: string;
+}
+
+export const LEVELS: Level[] = [
+  { id: 'ig', name: 'IGCSE / IG', shortName: 'IG' },
+  { id: 'as', name: 'AS Level', shortName: 'AS' },
+  { id: 'a-level', name: 'A Level', shortName: 'A Level' },
+  { id: 'ib', name: 'IB', shortName: 'IB' },
+  { id: 'ap', name: 'AP', shortName: 'AP' },
+  { id: 'other', name: 'Other', shortName: 'Other' },
+];
+
+export function levelName(id: string): string {
+  return LEVELS.find((level) => level.id === id)?.name ?? 'Other';
+}
+
+export interface ResourceTypeOption {
+  id: ResourceType;
+  name: string;
+}
+
+export const RESOURCE_TYPES: ResourceTypeOption[] = [
+  { id: 'notes', name: 'Notes' },
+  { id: 'practice', name: 'Practice Questions' },
+  { id: 'past-paper', name: 'Past Papers' },
+  { id: 'other', name: 'Other' },
+];
+
+export function resourceTypeName(id: string): string {
+  return RESOURCE_TYPES.find((type) => type.id === id)?.name ?? 'Other';
+}
+
+/** Subject catalogue shared by IG, AS/A-level, IB and AP resources. */
 export const CATEGORIES: Category[] = [
   { id: 'math', name: 'Mathematics' },
+  { id: 'further-math', name: 'Further Mathematics' },
   { id: 'physics', name: 'Physics' },
   { id: 'chemistry', name: 'Chemistry' },
   { id: 'biology', name: 'Biology' },
-  { id: 'economics', name: 'Economics & Business' },
+  { id: 'english', name: 'English Literature / Language' },
+  { id: 'chinese', name: 'Chinese' },
   { id: 'cs', name: 'Computer Science' },
-  { id: 'language', name: 'Languages & Literature' },
-  { id: 'history', name: 'History & Geography' },
-  { id: 'art', name: 'Arts & Design' },
-  { id: 'exam', name: 'Exam Prep & Past Papers' },
-  { id: 'template', name: 'Templates & Tools' },
-  { id: 'music', name: 'Music & Audio' },
-  { id: 'video', name: 'Video Courses' },
-  { id: 'software', name: 'Software & Scripts' },
+  { id: 'history', name: 'History' },
+  { id: 'geography', name: 'Geography' },
+  { id: 'economics', name: 'Economics' },
+  { id: 'business', name: 'Business Studies' },
+  { id: 'psychology', name: 'Psychology' },
+  { id: 'sociology', name: 'Sociology' },
+  { id: 'art', name: 'Art & Design' },
+  { id: 'music', name: 'Music' },
+  { id: 'ict', name: 'ICT' },
   { id: 'other', name: 'Other' },
 ];
 
@@ -191,8 +237,18 @@ export function categoryName(id: string): string {
   return CATEGORIES.find((c) => c.id === id)?.name ?? 'Other';
 }
 
+/** Display label such as “IG · Mathematics · Notes”. */
+export function classificationLabel(
+  levelId: string,
+  categoryId: string,
+  resourceType: string,
+): string {
+  return `${LEVELS.find((level) => level.id === levelId)?.shortName ?? 'Other'} · ${categoryName(categoryId)} · ${resourceTypeName(resourceType)}`;
+}
+
 export type GroupSort = 'members' | 'repos' | 'recent';
 export type RepoSort = 'recent' | 'popular' | 'views' | 'price_asc' | 'price_desc' | 'rating' | 'sales';
+export type MarketplaceZone = 'all' | 'free' | 'paid';
 
 export interface RepoListResult {
   items: Repository[];

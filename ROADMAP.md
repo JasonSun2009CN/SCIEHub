@@ -4,6 +4,8 @@
 
 **Status: ✅ All phases complete**（含 Phase 7 迭代二与 Phase 11 市场化，verified via production build + typecheck + end-to-end API tests + headless browser render）。
 
+> 部署已从单台 VPS/Fastify 迁移到 **Cloudflare Workers + D1 + R2 + Workers Assets**；Phase 6 中关于 Nginx/systemd/本地 SQLite 的旧描述仅作历史记录。当前部署方式见 `docs/DEPLOYMENT.md`。
+
 > Phase 0–6 为原始资源/小组模型；Phase 7 迭代为「Repository 模型 + 社区功能」；Phase 11 迭代为「资源共享/售卖市场」。
 
 ## Phase 0 — 工程脚手架 ✅

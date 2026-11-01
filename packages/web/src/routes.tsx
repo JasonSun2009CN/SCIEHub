@@ -25,6 +25,8 @@ export function AppRoutes() {
         <Route index element={<HomePage />} />
         <Route path="/feed" element={<FeedPage />} />
         <Route path="/marketplace" element={<FeedPage />} />
+        <Route path="/free" element={<FeedPage zone="free" />} />
+        <Route path="/paid" element={<FeedPage zone="paid" />} />
         <Route path="/repos/:id" element={<RepoDetailPage />} />
         <Route path="/checkout/:repoId" element={<CheckoutPage />} />
         <Route path="/upload" element={<UploadPage />} />

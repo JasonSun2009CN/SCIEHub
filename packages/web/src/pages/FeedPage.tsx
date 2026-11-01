@@ -2,7 +2,16 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { FaBook, FaSearch, FaSpinner, FaUsers } from 'react-icons/fa';
-import { CATEGORIES, type Group, type HomeData, type Repository, type RepoListResult } from '@sciehub/shared';
+import {
+  CATEGORIES,
+  LEVELS,
+  RESOURCE_TYPES,
+  type Group,
+  type HomeData,
+  type MarketplaceZone,
+  type Repository,
+  type RepoListResult,
+} from '@sciehub/shared';
 import { api } from '@/lib/api';
 import { PageMeta } from '@/components/common/PageMeta';
 import { Button } from '@/components/ui/button';
@@ -15,7 +24,7 @@ import { timeAgo } from '@/lib/utils';
 
 const PAGE_SIZE = 12;
 
-const HOT_TAGS = ['ib', 'alevel', 'igcse', 'ap', 'math', 'physics', 'chemistry', 'economics', 'python', 'exam'];
+const HOT_TAGS = ['igcse', 'alevel', 'math', 'physics', 'chemistry', 'biology', 'english', 'chinese', 'cs', 'past-paper'];
 
 function SidebarBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -26,14 +35,19 @@ function SidebarBlock({ title, children }: { title: string; children: React.Reac
   );
 }
 
-export function FeedPage() {
+export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get('q') ?? '';
   const category = searchParams.get('category') ?? '';
+  const level = searchParams.get('level') ?? '';
+  const resourceType = searchParams.get('resourceType') ?? '';
   const sort = searchParams.get('sort') ?? 'recent';
-  const pricingType = searchParams.get('pricingType') ?? '';
-  const paramsKey = JSON.stringify({ q, category, sort, pricingType });
+  const lockedPricing = zone === 'free' || zone === 'paid' ? zone : '';
+  const pricingType = lockedPricing || searchParams.get('pricingType') || '';
+  const paramsKey = JSON.stringify({ q, category, level, resourceType, sort, pricingType });
+  const pageTitle =
+    zone === 'free' ? 'Free resources' : zone === 'paid' ? 'Paid resources' : 'Marketplace';
 
   const [searchInput, setSearchInput] = useState(q);
   const [offset, setOffset] = useState(0);
@@ -48,7 +62,7 @@ export function FeedPage() {
     queryKey: ['repos', paramsKey, offset],
     queryFn: () =>
       api<RepoListResult>(
-        `/repos?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}&pricingType=${encodeURIComponent(pricingType)}&limit=${PAGE_SIZE}&offset=${offset}`,
+        `/repos?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&level=${encodeURIComponent(level)}&resourceType=${encodeURIComponent(resourceType)}&sort=${encodeURIComponent(sort)}&pricingType=${encodeURIComponent(pricingType)}&limit=${PAGE_SIZE}&offset=${offset}`,
       ),
   });
 
@@ -88,9 +102,23 @@ export function FeedPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <PageMeta
-        title="Marketplace"
-        description="Browse, buy and download free and premium study resources on SCIEHub."
+        title={pageTitle}
+        description={
+          zone === 'free'
+            ? 'Download free IG, AS, A Level, IB and AP study resources on SCIEHub.'
+            : zone === 'paid'
+              ? 'Browse premium IG, AS, A Level, IB and AP study resources on SCIEHub.'
+              : 'Browse, buy and download free and premium study resources on SCIEHub.'
+        }
       />
+      {zone !== 'all' && (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold">{pageTitle}</h1>
+          <span className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted-foreground">
+            {zone === 'free' ? 'Always free to download' : 'Unlock after wallet payment'}
+          </span>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Left sidebar */}
@@ -153,27 +181,51 @@ export function FeedPage() {
                 aria-label="Search resources"
               />
             </form>
-            <Select value={category} onValueChange={(v) => setParam('category', v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="All categories" />
+            <Select value={level} onValueChange={(v) => setParam('level', v === 'all' ? '' : v)}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="All levels" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All categories</SelectItem>
+                <SelectItem value="all">All levels</SelectItem>
+                {LEVELS.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={category} onValueChange={(v) => setParam('category', v === 'all' ? '' : v)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="All subjects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All subjects</SelectItem>
                 {CATEGORIES.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={pricingType} onValueChange={(v) => setParam('pricingType', v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="All pricing" />
+            <Select value={resourceType} onValueChange={(v) => setParam('resourceType', v === 'all' ? '' : v)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="All resource types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All pricing</SelectItem>
-                <SelectItem value="free">Free only</SelectItem>
-                <SelectItem value="paid">Paid only</SelectItem>
+                <SelectItem value="all">All resource types</SelectItem>
+                {RESOURCE_TYPES.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {!lockedPricing && (
+              <Select value={pricingType} onValueChange={(v) => setParam('pricingType', v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="All pricing" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All pricing</SelectItem>
+                  <SelectItem value="free">Free only</SelectItem>
+                  <SelectItem value="paid">Paid only</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             <Select value={sort} onValueChange={(v) => setParam('sort', v)}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Sort" />

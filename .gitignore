@@ -3,6 +3,8 @@ dist/
 *.log
 .DS_Store
 .env
+.dev.vars
+.wrangler/
 *.db
 *.db-journal
 *.db-shm

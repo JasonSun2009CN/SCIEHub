@@ -63,3 +63,15 @@
 - **Decision**: 每个 Repository 增加 `pricing_type`（free/paid）、`price`、`currency`；新增 `orders`（含 platform_fee / seller_earning）、`purchases`、`reviews`、`wallet_transactions` 表与 User `wallet_balance`。支付流程：`POST /repos/:id/checkout` 创建待支付订单 → `POST /users/me/orders/:id/pay` 从买家钱包扣款、卖家按"价格 − 10% 平台费"入账、生成 purchase 记录解锁下载。卖家可在订单页主动退款；管理员可退款与给任意用户充值钱包。
 - **Alternatives**: 接入 Stripe/支付宝等真实支付（超出 MVP 范围、需资质）；纯展示不交易（不符合"售卖"诉求）。
 - **Consequences**: 交易闭环完整可演示（钱包/订单/退款/评价/流水）；真实充值与提现走管理员人工通道（`SCIEHUB_ALLOW_SELF_TOPUP=1` 仅为沙盒自充）；平台费率 `PLATFORM_FEE_RATE = 0.10` 集中定义可调；`purchases` 表唯一索引防重复购买。
+
+## ADR-011 部署迁移：Cloudflare Workers + D1 + R2
+- **Status**: Accepted
+- **Context**: 目标部署到 Cloudflare，并使用 GitHub push 自动更新；原 Fastify + better-sqlite3 + 本地磁盘无法运行在 Workers 运行时。
+- **Decision**: 后端改为 Cloudflare Worker + Hono；数据库改为 D1（SQL 迁移文件位于 `packages/server/migrations/`）；上传文件改为 R2；前端由 Workers Assets 托管并使用 SPA fallback。D1 无交互事务，支付/退款使用 `db.batch()` 加 SQLite trigger 保证幂等与余额检查。
+- **Consequences**: 单 Worker 部署，无需 VPS/Nginx/PM2；D1 查询全部异步，数据层需保持 `one/all/run/batch` 风格；上传受 Worker 请求/内存限制，默认单文件 50MB；本地开发使用 `wrangler dev` + 本地 D1 状态。
+
+## ADR-012 资源分类：Level + Subject + Resource Type
+- **Status**: Accepted
+- **Context**: 用户需要按 IG / AS / A-level 学科，以及笔记 / 练习题 / past paper 浏览和筛选资料；原来的单一分类字段无法同时表达这三个维度。
+- **Decision**: Repository 增加 `level_id`（ig / as / a-level / ib / ap / other）与 `resource_type`（notes / practice / past-paper / other），保留 `category_id` 表示学科；共享常量 `LEVELS` / `CATEGORIES` / `RESOURCE_TYPES` 作为前后端唯一来源。新增 `/free` 与 `/paid` 专区，复用 Marketplace 列表并锁定 `pricingType`。
+- **Consequences**: 列表筛选支持 level + subject + resource type + pricing 组合；新增分类需同步 shared 常量、D1 迁移、API 校验和前端选择器。旧数据在迁移后默认落到 `other`。

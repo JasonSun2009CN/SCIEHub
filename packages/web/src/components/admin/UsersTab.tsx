@@ -145,7 +145,7 @@ export function UsersTab() {
                   </div>
                 </div>
                 {u.isAdmin && <Badge variant="warning">Admin</Badge>}
-                {u.isSuspended && <Badge variant="error">Suspended</Badge>}
+                {u.isSuspended && <Badge variant="error">Banned</Badge>}
                 <div className="flex items-center gap-1">
                   {me?.id === u.id && u.isAdmin ? (
                     <Button
@@ -172,7 +172,7 @@ export function UsersTab() {
                       size="sm"
                       variant="ghost"
                       onClick={() => patchMutation.mutate({ id: u.id, patch: { isSuspended: !u.isSuspended } })}
-                      title={u.isSuspended ? 'Unsuspend' : 'Suspend'}
+                      title={u.isSuspended ? 'Unban account' : 'Ban account'}
                     >
                       {u.isSuspended ? (
                         <FaCheck className="h-3.5 w-3.5 text-success" />

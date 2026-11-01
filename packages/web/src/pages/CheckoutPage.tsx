@@ -193,7 +193,9 @@ export function CheckoutPage() {
               </Link>
               <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{repo.description}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge>{repo.categoryName}</Badge>
+                <Badge>{repo.levelName}</Badge>
+                <Badge variant="secondary">{repo.categoryName}</Badge>
+                <Badge variant="outline">{repo.resourceTypeName}</Badge>
                 <span>{formatNumber(repo.fileCount)} files</span>
                 <span>·</span>
                 <span>Sold {formatNumber(repo.totalSales)}×</span>

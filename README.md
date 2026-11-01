@@ -9,14 +9,17 @@ A GitHub-style **study-resource sharing & selling marketplace** for internationa
 | Layer | Choice |
 | --- | --- |
 | Frontend | React 18 · TypeScript · Vite 5 · TailwindCSS · shadcn/ui (Radix) · react-icons/fa · TanStack Query · React Router (history mode) |
-| Backend | Node.js · Fastify · TypeScript · better-sqlite3 |
-| Auth | JWT + bcrypt (email/password) |
+| Backend | Cloudflare Workers · Hono · TypeScript |
+| Data | Cloudflare D1 (SQLite) |
+| Files | Cloudflare R2 |
+| Auth | JWT (`jose`) + PBKDF2 (email/password) |
 | Repo | npm workspaces monorepo: `packages/web` + `packages/server` + `packages/shared` |
 
 ## Features
 
 ### Marketplace (buy & sell)
-- **Pricing** — every repository is either **Free** or **Paid**. Sellers set a price (¥/$, max 9,999) and a currency when creating or editing a repository.
+- **Free & paid zones** — dedicated `/free` and `/paid` zones, plus the full marketplace. Every repository is either **Free** or **Paid**; sellers set a price (¥/$, max 9,999) and a currency.
+- **Curriculum taxonomy** — resources are classified by level (**IGCSE / IG, AS, A Level, IB, AP**), subject (Math, English Literature/Language, Physics, Biology, Computer Science, Chinese, History, Chemistry, Economics, Business, Psychology…), and resource type (**Notes, Practice Questions, Past Papers**).
 - **Checkout** — `/checkout/:id` shows the full price breakdown (item price, 10% platform fee, seller earnings) and lets buyers **pay instantly from their wallet**.
 - **Wallet** — `/wallet` shows your balance, total income/spending and a full transaction history (purchases, sales, refunds, top-ups). Payouts from sales land in your wallet automatically.
 - **Orders** — `/orders` tracks every purchase (as buyer) and sale (as seller). Buyers can pay pending orders; **sellers can refund** a paid order, which reverses the money for both parties.
@@ -35,76 +38,81 @@ A GitHub-style **study-resource sharing & selling marketplace** for internationa
 - **Dark/light themes** (dark default) driven by CSS-variable tokens.
 
 ### Admin
-- **Admin console** — `/admin` shows site stats (including total sales & revenue), recent orders, review reports, delete violating repositories/files/comments, and suspend, un-admin or delete users.
+- **Admin console** — `/admin` shows site stats (including total sales & revenue), recent orders, review reports, delete violating repositories/files/comments, and **ban/unban, un-admin or delete users**.
 - **Orders tab** — admins can search all orders, view status, and **refund** paid orders.
 - **Top-up** — admins can add funds to any user's wallet from the Users tab (`/admin` → Users).
 
 ## Getting started (development)
 
-```bash
-npm install          # installs all workspaces
-npm run dev          # Fastify API on :4000 + Vite dev server on :5173 (proxies /api & /uploads)
-```
-
-Open http://localhost:5173.
-
-## Deploying to a server
-
-A short version lives below. For the full guide — Nginx/systemd/PM2, backups,
-upgrades, hardening — see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
-
-Requirements: **Node.js 18+** (tested on 22) and **npm**. No database service is needed — SQLite is a single file.
-
-On a fresh server, from a clean clone:
+Requirements: **Node.js 18+** and a Cloudflare account for `wrangler`.
 
 ```bash
-# 1. Install everything
 npm install
-
-# 2. Build the frontend + backend, then start
-npm start
-#   npm start automatically runs the production build first (via "prestart").
-#   Equivalent one-shot command: npm run deploy
-
-# 3. Open
-#   http://<server-ip-or-domain>:4000
+npx wrangler login       # one-time browser authorization
+npm run dev              # Worker on :8787 + Vite dev server on :5173
 ```
 
-`npm start` serves **both the built SPA and the API** on port `4000`. On first boot the app creates an empty SQLite database (`packages/server/data/sciehub.db`) and an uploads folder automatically — **no demo data is included**. Register an account at `/auth` and it works immediately.
+Open http://localhost:5173. Vite proxies `/api` and `/uploads` to `wrangler dev` on `:8787`.
+
+First-time setup creates local D1 state automatically via `predev`. To use your own Cloudflare resources, create them and replace the IDs in `wrangler.jsonc`:
+
+```bash
+npx wrangler d1 create sciehub
+npx wrangler r2 bucket create sciehub-uploads
+npm run db:migrate:local
+```
+
+## Deploying to Cloudflare
+
+The app runs as a single Worker: **Workers Assets** serve the built SPA, **Hono** handles `/api/*`, **D1** stores data, and **R2** stores uploads.
+
+```bash
+npm install
+npx wrangler login
+npm run deploy
+```
+
+`npm run deploy` builds `shared` + `web`, applies pending D1 migrations, and deploys the Worker. On the first deploy, also set the signing secret:
+
+```bash
+openssl rand -hex 48 | npx wrangler secret put JWT_SECRET
+```
 
 ### Production checklist
 
 | Step | Command / value |
 | --- | --- |
-| Open the firewall/security-group port | `4000` |
-| Set a real signing secret | `JWT_SECRET=<long-random-string> npm start` (otherwise a dev default is used) |
-| First user is the admin | The **first account registered** on a fresh install becomes the site admin automatically |
-| Make another user admin | `ADMIN_EMAILS=<their@email> npm start` (promoted on their register/login) or `npm run promote-admin -w @sciehub/server -- <email>` |
-| Optional: custom port | `PORT=8080 npm start` |
-| Optional: bind address | default `0.0.0.0` (all interfaces) |
-| Keep the service running | run under `pm2 start 'npm start'` or a systemd unit |
+| Set a real signing secret | `npx wrangler secret put JWT_SECRET` |
+| First user is the admin | The **first account registered** on a fresh database becomes the site admin automatically |
+| Make another user admin | Set `ADMIN_EMAILS=<their@email>` in the dashboard, or promote from `/admin` |
+| Custom domain | Workers & Pages → `sciehub` → Settings → Domains & Routes |
+| Push-to-deploy | Workers & Pages → `sciehub` → Settings → Builds → connect GitHub; build `npm ci && npm run build`, deploy `npm run deploy:ci` |
+| Logs | `npx wrangler tail` |
+| Backups | D1 export + R2 copy (see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)) |
 
-Back up two things after real usage starts: `packages/server/data/sciehub.db` and `packages/server/data/uploads/`.
+Fresh installs contain **no demo data**. Register an account at `/auth` and it works immediately. Large uploads are subject to Worker request/memory limits; the default is 50MB per file (configurable with `SCIEHUB_MAX_FILE_MB`).
 
 ## Environment variables
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PORT` | `4000` | HTTP port |
-| `HOST` | `0.0.0.0` | Bind address |
-| `JWT_SECRET` | dev-only default | **Set a real secret in production** |
+| `JWT_SECRET` | dev-only default | **Set as a Worker secret in production** |
 | `ADMIN_EMAILS` | empty | Optional: comma-separated emails that get **admin** on register/login (overrides the first-user rule) |
-| `DB_PATH` | `packages/server/data/sciehub.db` | SQLite file |
-| `UPLOAD_DIR` | `packages/server/data/uploads` | Uploaded files |
-| `WEB_DIST` | `packages/web/dist` | Built frontend (served in production) |
+| `SCIEHUB_MAX_FILE_MB` | `50` | Max size per uploaded file |
+| `SCIEHUB_MAX_FILES` | `8` | Max files per upload request |
+| `SCIEHUB_ALLOW_SELF_TOPUP` | unset | Set to `1` only for sandbox self top-ups |
+
+Cloudflare bindings (configured in `wrangler.jsonc`): `DB` (D1), `UPLOADS` (R2), `ASSETS` (Workers Assets). The app does not read `.env`; use `.dev.vars` locally and Worker secrets/vars in production.
 
 ## Monorepo layout
 
 ```
 packages/
 ├── shared/     # Domain types + constants (Repository, RepoFile, User, categories, report reasons…)
-├── server/     # Fastify API, SQLite schema, JWT auth, uploads, static SPA hosting
+├── server/     # Hono Worker API, D1 queries, JWT auth, R2 uploads
+│   └── migrations/  # D1 SQL migrations
 └── web/        # React SPA — pages, shadcn/ui components, theme system
+wrangler.jsonc  # Worker entry, D1/R2/Assets bindings, SPA fallback, cron
 ```
 
 ## Key routes
@@ -112,7 +120,9 @@ packages/
 | Route | Page |
 | --- | --- |
 | `/` | Home — marketplace hero, trending, top sellers, free resources, active groups |
-| `/marketplace` (alias `/feed`) | Browse/search resources with pricing + category filters and sorting |
+| `/marketplace` (alias `/feed`) | Browse/search resources with level, subject, resource-type and pricing filters |
+| `/free` | Free resources only |
+| `/paid` | Paid resources only |
 | `/repos/:id` | Repository detail — files, price/purchase panel, reviews, comments, share |
 | `/checkout/:id` | Checkout — price breakdown and wallet payment for a paid resource |
 | `/orders` | Your orders — as buyer (pay) and as seller (refund) |
@@ -140,9 +150,9 @@ A plain-language guide for buyers and sellers lives in [`docs/USER_MANUAL.md`](.
 - **Reviews** — only verified buyers (and owners of free resources) can review. Reviews can be edited or deleted by their author.
 - Reports are triaged in `/admin` → Reports.
 - **Email registered without your permission?** If you find your email is already taken on the sign-up page, use that email to write to `jasonsun2009@yeah.net` — the sign-up form includes a ready-made "claim" email link. Never create an account on an email you don't own. Forgot your password? The sign-in form has a "contact the admin to reset it" link to the same address.
-- **Admins** can open `/admin` from their account menu. The **first registered user** on a fresh install becomes the site admin — no default password exists anywhere in the code. Backups: emails in `ADMIN_EMAILS` are auto-promoted on register/login, and the `promote-admin` script grants admin to any existing user. Admins can **add other admins** (Users tab) and **step down** (transfer) their own admin role — the last admin is protected from being removed. Tip: register your owner account first so no stranger grabs admin on a public server.
+- **Admins** can open `/admin` from their account menu. The **first registered user** on a fresh install becomes the site admin — no default password exists anywhere in the code. Emails in `ADMIN_EMAILS` are auto-promoted on register/login, and existing admins can promote others from the Users tab. Admins can **add other admins** and **step down** (transfer) their own admin role — the last admin is protected from being removed. Tip: register your owner account first so no stranger grabs admin on a public server.
 - **Account security** — every login attempt is recorded and shown on `/settings` (login history). "Sign out all devices" invalidates every session. Deactivating an account freezes it for 30 days; signing in again restores it, otherwise it is deleted. Accounts can also be permanently deleted with their password.
-- Uploaded files live on the server disk; the database stores relative paths. Back up both `data/sciehub.db` and `data/uploads/`.
-- React Router uses history mode — the Fastify server falls back to `index.html` so deep links and refreshes work in production.
+- Uploaded files live in Cloudflare R2; D1 stores `/uploads/<key>` paths. Back up/export both D1 and the R2 bucket.
+- React Router uses history mode — Workers Assets serve `index.html` for unmatched navigation routes, so deep links and refreshes work.
 - Source: [github.com/JasonSun2009CN/SCIEHub](https://github.com/JasonSun2009CN/SCIEHub)
 - Architecture decisions are recorded in [`ADR.md`](./ADR.md); see [`ROADMAP.md`](./ROADMAP.md) and [`HANDOFF.md`](./HANDOFF.md) for status and handoff details.

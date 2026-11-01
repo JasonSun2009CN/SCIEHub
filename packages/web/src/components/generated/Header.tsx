@@ -33,6 +33,8 @@ import type { WalletOverview } from '@sciehub/shared';
 
 const NAV_ITEMS = [
   { to: '/marketplace', label: 'Marketplace' },
+  { to: '/free', label: 'Free' },
+  { to: '/paid', label: 'Paid' },
   { to: '/groups', label: 'Groups' },
   { to: '/leaderboard', label: 'Leaderboard' },
 ];
@@ -219,6 +221,24 @@ export function Header() {
           )}
         </div>
       </div>
+      <nav className="flex gap-1 overflow-x-auto border-t border-border px-4 py-1.5 md:hidden">
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              cn(
+                'shrink-0 rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                isActive
+                  ? 'bg-surface-2 text-foreground'
+                  : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground',
+              )
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
     </header>
   );
 }

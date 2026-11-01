@@ -1,31 +1,31 @@
-import jwt from 'jsonwebtoken';
-import type { FastifyReply, FastifyRequest } from 'fastify';
-import { config } from './config.js';
+import { SignJWT, jwtVerify } from 'jose';
+import type { Context } from 'hono';
+import { getConfig } from './runtime.js';
 import { getDeactivatedAt, getTokenVersion, getUserById } from './db.js';
+import { HttpError } from './http.js';
+import type { AppEnv, AuthUser } from './types.js';
 
-export interface AuthUser {
-  id: string;
-  username: string;
-  /** token_version embedded at sign time, used to invalidate all sessions. */
-  v?: number;
+const encoder = new TextEncoder();
+
+function secretKey(): Uint8Array {
+  return encoder.encode(getConfig().jwtSecret);
 }
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    authUser: AuthUser | null;
-  }
+export async function signToken(
+  user: { id: string; username: string },
+  tokenVersion?: number,
+): Promise<string> {
+  return await new SignJWT({ username: user.username, v: tokenVersion ?? 0 })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id)
+    .setIssuedAt()
+    .setExpirationTime('30d')
+    .sign(secretKey());
 }
 
-export function signToken(user: { id: string; username: string }, tokenVersion?: number): string {
-  return jwt.sign({ username: user.username, v: tokenVersion ?? 0 }, config.jwtSecret, {
-    subject: user.id,
-    expiresIn: config.jwtExpiresIn,
-  });
-}
-
-export function parseToken(token: string): AuthUser | null {
+export async function parseToken(token: string): Promise<AuthUser | null> {
   try {
-    const payload = jwt.verify(token, config.jwtSecret) as jwt.JwtPayload;
+    const { payload } = await jwtVerify(token, secretKey());
     if (!payload.sub) return null;
     return {
       id: payload.sub,
@@ -37,50 +37,33 @@ export function parseToken(token: string): AuthUser | null {
   }
 }
 
-/** Populates req.authUser for every request when a valid Bearer token is sent. */
-export async function authOnRequest(req: FastifyRequest): Promise<void> {
-  req.authUser = null;
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) return;
-  const user = parseToken(header.slice(7));
-  if (user) req.authUser = user;
-}
+/** Returns the authenticated user or throws a JSON-friendly HTTP error. */
+export async function requireAuth(c: Context<AppEnv>): Promise<AuthUser> {
+  const authUser = c.get('authUser');
+  if (!authUser) throw new HttpError(401, 'Authentication required');
 
-/** Returns the authenticated user or sends a 401/403 and returns null. */
-export function requireAuth(req: FastifyRequest, reply: FastifyReply): AuthUser | null {
-  if (!req.authUser) {
-    reply.code(401).send({ error: 'Authentication required' });
-    return null;
-  }
-  const user = getUserById(req.authUser.id);
-  if (!user) {
-    reply.code(401).send({ error: 'User no longer exists' });
-    return null;
-  }
+  const user = await getUserById(authUser.id);
+  if (!user) throw new HttpError(401, 'User no longer exists');
   if (user.isSuspended) {
-    reply.code(403).send({ error: 'This account has been suspended. Contact the admin at jasonsun2009@yeah.net.' });
-    return null;
+    throw new HttpError(
+      403,
+      'This account has been suspended. Contact the admin at jasonsun2009@yeah.net.',
+    );
   }
-  if (getDeactivatedAt(user.id)) {
-    reply.code(403).send({ error: 'This account is deactivated. Sign in again to restore it.' });
-    return null;
+  if (await getDeactivatedAt(user.id)) {
+    throw new HttpError(403, 'This account is deactivated. Sign in again to restore it.');
   }
   // Token version mismatch means the user signed out all devices (or was forced out).
-  if (getTokenVersion(user.id) !== req.authUser.v) {
-    reply.code(401).send({ error: 'Session has ended — please sign in again' });
-    return null;
+  if ((await getTokenVersion(user.id)) !== authUser.v) {
+    throw new HttpError(401, 'Session has ended — please sign in again');
   }
-  return req.authUser;
+  return authUser;
 }
 
 /** Like requireAuth, but also requires the account to be an admin. */
-export function requireAdmin(req: FastifyRequest, reply: FastifyReply): AuthUser | null {
-  const auth = requireAuth(req, reply);
-  if (!auth) return null;
-  const user = getUserById(auth.id);
-  if (!user?.isAdmin) {
-    reply.code(403).send({ error: 'Admin access required' });
-    return null;
-  }
+export async function requireAdmin(c: Context<AppEnv>): Promise<AuthUser> {
+  const auth = await requireAuth(c);
+  const user = await getUserById(auth.id);
+  if (!user?.isAdmin) throw new HttpError(403, 'Admin access required');
   return auth;
 }

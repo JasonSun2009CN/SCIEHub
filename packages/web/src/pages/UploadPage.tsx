@@ -15,12 +15,16 @@ import {
 import {
   CATEGORIES,
   CURRENCIES,
+  LEVELS,
   MAX_FILE_PRICE,
   PLATFORM_FEE_RATE,
+  RESOURCE_TYPES,
   formatPrice,
   type Currency,
+  type EducationLevel,
   type Group,
   type PricingType,
+  type ResourceType,
   type RepoFile,
   type Repository,
 } from '@sciehub/shared';
@@ -60,7 +64,9 @@ export function UploadPage() {
   // New-repo fields
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [levelId, setLevelId] = useState<EducationLevel | ''>('');
   const [categoryId, setCategoryId] = useState('');
+  const [resourceType, setResourceType] = useState<ResourceType | ''>('');
   const [tags, setTags] = useState('');
   const [shareGroupIds, setShareGroupIds] = useState<string[]>([]);
   const [pricingType, setPricingType] = useState<PricingType>('free');
@@ -115,8 +121,17 @@ export function UploadPage() {
       toast('Add at least one file', 'error');
       return;
     }
-    if (isNewRepo && (!name.trim() || !categoryId)) {
-      toast(isNewRepo && !name.trim() ? 'Repository name is required' : 'Choose a category', 'error');
+    if (isNewRepo && (!name.trim() || !levelId || !categoryId || !resourceType)) {
+      toast(
+        !name.trim()
+          ? 'Repository name is required'
+          : !levelId
+            ? 'Choose a level (IG, AS, A Level, IB or AP)'
+            : !categoryId
+              ? 'Choose a subject'
+              : 'Choose a resource type',
+        'error',
+      );
       return;
     }
     if (pricingType === 'paid') {
@@ -136,7 +151,9 @@ export function UploadPage() {
           json: {
             name: name.trim(),
             description: description.trim(),
+            levelId,
             categoryId,
+            resourceType,
             tags,
             pricingType,
             price: pricingType === 'paid' ? Number(price) : 0,
@@ -230,7 +247,7 @@ export function UploadPage() {
               id="repo-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. IB Physics — Waves Notes"
+              placeholder="e.g. IG Physics — Waves Notes"
             />
           </div>
           <div className="space-y-2">
@@ -245,10 +262,23 @@ export function UploadPage() {
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Category *</Label>
+              <Label>Level *</Label>
+              <Select value={levelId} onValueChange={(v) => setLevelId(v as EducationLevel)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEVELS.map((level) => (
+                    <SelectItem key={level.id} value={level.id}>{level.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Subject *</Label>
               <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder="Select a subject" />
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((c) => (
@@ -258,8 +288,21 @@ export function UploadPage() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label>Resource type *</Label>
+              <Select value={resourceType} onValueChange={(v) => setResourceType(v as ResourceType)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Notes, practice or past paper" />
+                </SelectTrigger>
+                <SelectContent>
+                  {RESOURCE_TYPES.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="repo-tags">Tags</Label>
-              <Input id="repo-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="math, notes, exam" />
+              <Input id="repo-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="waves, trig, exam" />
             </div>
           </div>
           {availableGroups.length > 0 && (

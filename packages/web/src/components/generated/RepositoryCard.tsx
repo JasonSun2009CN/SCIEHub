@@ -10,7 +10,7 @@ import {
   FaStar,
   FaTag,
 } from 'react-icons/fa';
-import { formatBytes, formatPrice, type Repository } from '@sciehub/shared';
+import { classificationLabel, formatBytes, formatPrice, type Repository } from '@sciehub/shared';
 import { Badge } from '@/components/ui/badge';
 import { UserAvatar } from './UserAvatar';
 import { cn, formatNumber, timeAgo } from '@/lib/utils';
@@ -101,6 +101,10 @@ export function RepositoryCard({ repo, index = 0, showGroups = true }: Repositor
           <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
             {repo.description || 'No description provided.'}
           </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Badge variant="outline">{repo.levelName}</Badge>
+            <Badge variant="secondary">{repo.resourceTypeName}</Badge>
+          </div>
         </div>
       </div>
 
@@ -160,7 +164,7 @@ export function RepositoryCard({ repo, index = 0, showGroups = true }: Repositor
           size="sm"
         />
         <span className="text-xs text-muted-foreground">
-          {repo.owner.nickname} · {repo.categoryName}
+          {repo.owner.nickname} · {classificationLabel(repo.levelId, repo.categoryId, repo.resourceType)}
         </span>
       </div>
     </div>

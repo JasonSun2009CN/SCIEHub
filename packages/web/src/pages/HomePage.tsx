@@ -296,7 +296,7 @@ export function HomePage() {
               </Badge>
             </div>
             <Link
-              to="/marketplace?pricingType=free"
+              to="/free"
               className="text-sm font-medium text-accent hover:underline"
             >
               Browse all free →

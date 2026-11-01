@@ -91,7 +91,9 @@ export function ReposTab() {
                 <Link to={`/repos/${repo.id}`} className="min-w-0 max-w-[18rem] flex-1 truncate font-medium hover:text-accent">
                   {repo.name}
                 </Link>
-                <Badge variant="outline">{repo.categoryName}</Badge>
+                <Badge variant="outline">{repo.levelName}</Badge>
+                <Badge variant="secondary">{repo.categoryName}</Badge>
+                <Badge variant="outline">{repo.resourceTypeName}</Badge>
                 <Link to={`/users/${repo.owner.username}`} className="text-xs text-muted-foreground hover:text-accent">
                   @{repo.owner.username}
                 </Link>

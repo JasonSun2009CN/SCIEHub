@@ -1,20 +1,19 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { Hono } from 'hono';
 import {
   CATEGORIES,
   CURRENCIES,
+  LEVELS,
   MAX_FILE_PRICE,
   PLATFORM_FEE_RATE,
+  RESOURCE_TYPES,
   formatBytes,
   formatPrice,
   type Currency,
+  type EducationLevel,
   type PricingType,
-  type RepoFile,
+  type ResourceType,
   type ReviewRating,
 } from '@sciehub/shared';
-import { config } from '../config.js';
 import { requireAuth } from '../auth.js';
 import {
   addFileToRepo,
@@ -28,9 +27,11 @@ import {
   getOrderById,
   getRepoById,
   getRepoFileById,
+  getReviewById,
   groupRole,
   hasUserPurchasedRepo,
   incrementFileDownload,
+  inferFileType,
   listFreeRepos,
   listRepoComments,
   listRepoFiles,
@@ -42,8 +43,26 @@ import {
   unshareRepoFromGroup,
   updateRepo,
   updateReview,
-  inferFileType,
 } from '../db.js';
+import { uploadKey, putUpload, getUpload, deleteUpload } from '../storage.js';
+import { getConfig } from '../runtime.js';
+import { readJson } from '../http.js';
+import type { AppEnv } from '../types.js';
+
+function validateClassification(body: {
+  levelId?: string;
+  resourceType?: string;
+}): { ok: true; levelId: EducationLevel; resourceType: ResourceType } | { ok: false; error: string } {
+  const levelId = body.levelId ?? '';
+  if (!LEVELS.some((level) => level.id === levelId)) {
+    return { ok: false, error: 'Please choose a valid level (IG, AS, A Level, IB or AP)' };
+  }
+  const resourceType = body.resourceType ?? '';
+  if (!RESOURCE_TYPES.some((type) => type.id === resourceType)) {
+    return { ok: false, error: 'Please choose a valid resource type' };
+  }
+  return { ok: true, levelId: levelId as EducationLevel, resourceType: resourceType as ResourceType };
+}
 
 function validatePricing(body: {
   pricingType?: PricingType;
@@ -60,108 +79,120 @@ function validatePricing(body: {
       return { ok: false, error: `price must be > 0 and <= ${MAX_FILE_PRICE}` };
     }
     const currency = body.currency ?? 'CNY';
-    if (!CURRENCIES.some((c) => c.code === currency)) {
+    if (!CURRENCIES.some((item) => item.code === currency)) {
       return { ok: false, error: 'Unsupported currency' };
     }
   }
   return { ok: true };
 }
 
-export async function registerRepoRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/repos', async (req) => {
-    const q = req.query as Record<string, string | undefined>;
-    const limit = Math.min(Math.max(Number(q.limit) || 20, 1), 100);
-    const offset = Math.max(Number(q.offset) || 0, 0);
-    const minPrice = q.minPrice !== undefined ? Number(q.minPrice) : undefined;
-    const maxPrice = q.maxPrice !== undefined ? Number(q.maxPrice) : undefined;
-    return listRepos(
-      {
-        search: q.search,
-        category: q.category,
-        sort:
-          (q.sort as 'recent' | 'popular' | 'views' | 'sales' | 'rating' | 'price_asc' | 'price_desc') ??
-          'recent',
-        ownerId: q.ownerId,
-        groupId: q.groupId,
-        pricingType:
-          q.pricingType === 'free' || q.pricingType === 'paid' ? q.pricingType : undefined,
-        minPrice: Number.isFinite(minPrice) ? minPrice : undefined,
-        maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
-        limit,
-        offset,
-      },
-      req.authUser?.id ?? null,
+export function registerRepoRoutes(app: Hono<AppEnv>): void {
+  app.get('/api/repos', async (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 20, 1), 100);
+    const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
+    const minPriceRaw = c.req.query('minPrice');
+    const maxPriceRaw = c.req.query('maxPrice');
+    const minPrice = minPriceRaw !== undefined ? Number(minPriceRaw) : undefined;
+    const maxPrice = maxPriceRaw !== undefined ? Number(maxPriceRaw) : undefined;
+    return c.json(
+      await listRepos(
+        {
+          search: c.req.query('search'),
+          category: c.req.query('category'),
+          level: c.req.query('level'),
+          resourceType: c.req.query('resourceType'),
+          sort:
+            (c.req.query('sort') as
+              | 'recent'
+              | 'popular'
+              | 'views'
+              | 'sales'
+              | 'rating'
+              | 'price_asc'
+              | 'price_desc') ?? 'recent',
+          ownerId: c.req.query('ownerId'),
+          groupId: c.req.query('groupId'),
+          pricingType:
+            c.req.query('pricingType') === 'free' || c.req.query('pricingType') === 'paid'
+              ? (c.req.query('pricingType') as 'free' | 'paid')
+              : undefined,
+          minPrice: Number.isFinite(minPrice) ? minPrice : undefined,
+          maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
+          limit,
+          offset,
+        },
+        c.get('authUser')?.id ?? null,
+      ),
     );
   });
 
-  app.get('/api/repos/free', async (req) => {
-    const q = req.query as Record<string, string | undefined>;
-    const limit = Math.min(Math.max(Number(q.limit) || 20, 1), 100);
-    return { items: listFreeRepos(limit, req.authUser?.id ?? null) };
+  app.get('/api/repos/free', async (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 20, 1), 100);
+    return c.json({ items: await listFreeRepos(limit, c.get('authUser')?.id ?? null) });
   });
 
-  app.get('/api/repos/:id', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, req.authUser?.id ?? null, true);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
-    const allFiles = listRepoFiles(id);
-    const isOwner = repo.ownerId === req.authUser?.id;
-    const isPurchased = req.authUser
-      ? hasUserPurchasedRepo(req.authUser.id, id)
-      : false;
+  app.get('/api/repos/:id', async (c) => {
+    const { id } = c.req.param();
+    const authUser = c.get('authUser');
+    const repo = await getRepoById(id, authUser?.id ?? null, true);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
+    const allFiles = await listRepoFiles(id);
+    const isOwner = repo.ownerId === authUser?.id;
+    const isPurchased = authUser ? await hasUserPurchasedRepo(authUser.id, id) : false;
     const canAccessAll = isOwner || isPurchased || repo.pricingType === 'free';
-    const files = canAccessAll
-      ? allFiles
-      : allFiles.filter((f) => f.isPreview);
-    const related = listRepos(
-      { category: repo.categoryId, limit: 5, offset: 0 },
-      req.authUser?.id ?? null,
-    ).items.filter((r) => r.id !== id);
-    const reviews = listRepoReviews(id);
-    return {
+    const files = canAccessAll ? allFiles : allFiles.filter((file) => file.isPreview);
+    const related = (
+      await listRepos({ category: repo.categoryId, limit: 5, offset: 0 }, authUser?.id ?? null)
+    ).items.filter((item) => item.id !== id);
+    return c.json({
       repo: { ...repo, isPurchased: isPurchased || undefined },
       files,
       related,
-      reviews,
+      reviews: await listRepoReviews(id),
       purchaseState: {
         isOwner,
         isPurchased,
-        canReview: req.authUser ? canUserReviewRepo(req.authUser.id, id) : false,
+        canReview: authUser ? await canUserReviewRepo(authUser.id, id) : false,
       },
-    };
+    });
   });
 
-  app.post('/api/repos', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const body = (req.body ?? {}) as {
+  app.post('/api/repos', async (c) => {
+    const authUser = await requireAuth(c);
+    const body = await readJson<{
       name?: string;
       description?: string;
       categoryId?: string;
+      levelId?: string;
+      resourceType?: string;
       tags?: string;
       pricingType?: PricingType;
       price?: number;
       currency?: Currency;
       previewImageUrl?: string;
-    };
+    }>(c);
     const name = body.name?.trim() ?? '';
     if (name.length < 2 || name.length > 80) {
-      return reply.code(400).send({ error: 'Repository name must be 2–80 characters' });
+      return c.json({ error: 'Repository name must be 2–80 characters' }, 400);
     }
-    if (!body.categoryId || !CATEGORIES.some((c) => c.id === body.categoryId)) {
-      return reply.code(400).send({ error: 'Please choose a valid category' });
+    if (!body.categoryId || !CATEGORIES.some((category) => category.id === body.categoryId)) {
+      return c.json({ error: 'Please choose a valid subject' }, 400);
     }
-    const pv = validatePricing(body);
-    if (!pv.ok) return reply.code(400).send({ error: pv.error });
+    const classification = validateClassification(body);
+    if (!classification.ok) return c.json({ error: classification.error }, 400);
+    const pricing = validatePricing(body);
+    if (!pricing.ok) return c.json({ error: pricing.error }, 400);
     const tags = (body.tags ?? '')
       .split(',')
-      .map((t) => t.trim())
+      .map((tag) => tag.trim())
       .filter(Boolean)
       .slice(0, 8);
-    const repo = createRepo({
+    const repo = await createRepo({
       name,
       description: body.description?.trim() ?? '',
       categoryId: body.categoryId,
+      levelId: classification.levelId,
+      resourceType: classification.resourceType,
       tags,
       ownerId: authUser.id,
       pricingType: body.pricingType ?? 'free',
@@ -169,54 +200,73 @@ export async function registerRepoRoutes(app: FastifyInstance): Promise<void> {
       currency: (body.currency ?? 'CNY') as Currency,
       previewImageUrl: body.previewImageUrl?.trim() || undefined,
     });
-    return reply.code(201).send({ repo });
+    return c.json({ repo }, 201);
   });
 
-  app.patch('/api/repos/:id', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
+  app.patch('/api/repos/:id', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    const repo = await getRepoById(id, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
     if (repo.ownerId !== authUser.id) {
-      return reply.code(403).send({ error: 'Only the owner can edit this repository' });
+      return c.json({ error: 'Only the owner can edit this repository' }, 403);
     }
-    const body = (req.body ?? {}) as {
+    const body = await readJson<{
       name?: string;
       description?: string;
       categoryId?: string;
+      levelId?: string;
+      resourceType?: string;
       tags?: string;
       pricingType?: PricingType;
       price?: number;
       currency?: Currency;
       previewImageUrl?: string | null;
-    };
-    if (typeof body.name === 'string' && (body.name.trim().length < 2 || body.name.trim().length > 80)) {
-      return reply.code(400).send({ error: 'Repository name must be 2–80 characters' });
+    }>(c);
+    if (
+      typeof body.name === 'string' &&
+      (body.name.trim().length < 2 || body.name.trim().length > 80)
+    ) {
+      return c.json({ error: 'Repository name must be 2–80 characters' }, 400);
     }
-    if (body.categoryId && !CATEGORIES.some((c) => c.id === body.categoryId)) {
-      return reply.code(400).send({ error: 'Please choose a valid category' });
+    if (body.categoryId && !CATEGORIES.some((category) => category.id === body.categoryId)) {
+      return c.json({ error: 'Please choose a valid subject' }, 400);
+    }
+    const patchClassification: { levelId?: EducationLevel; resourceType?: ResourceType } = {};
+    if (body.levelId !== undefined || body.resourceType !== undefined) {
+      const classification = validateClassification({
+        levelId: body.levelId ?? repo.levelId,
+        resourceType: body.resourceType ?? repo.resourceType,
+      });
+      if (!classification.ok) return c.json({ error: classification.error }, 400);
+      patchClassification.levelId = classification.levelId;
+      patchClassification.resourceType = classification.resourceType;
     }
     const patchPricing: { pricingType?: PricingType; price?: number; currency?: Currency } = {};
     if (body.pricingType !== undefined) {
-      const pv = validatePricing({
+      const pricing = validatePricing({
         pricingType: body.pricingType,
         price: body.price,
         currency: body.currency,
       });
-      if (!pv.ok) return reply.code(400).send({ error: pv.error });
+      if (!pricing.ok) return c.json({ error: pricing.error }, 400);
       patchPricing.pricingType = body.pricingType;
       patchPricing.price = body.pricingType === 'paid' ? Number(body.price) : 0;
       patchPricing.currency = (body.currency ?? 'CNY') as Currency;
     }
     const tags =
       typeof body.tags === 'string'
-        ? body.tags.split(',').map((t) => t.trim()).filter(Boolean).slice(0, 8)
+        ? body.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+            .slice(0, 8)
         : undefined;
-    const updated = updateRepo(id, {
+    const updated = await updateRepo(id, {
       name: typeof body.name === 'string' ? body.name.trim() : undefined,
       description: typeof body.description === 'string' ? body.description.trim() : undefined,
       categoryId: body.categoryId,
+      ...patchClassification,
       tags,
       ...patchPricing,
       previewImageUrl:
@@ -226,41 +276,39 @@ export async function registerRepoRoutes(app: FastifyInstance): Promise<void> {
             : body.previewImageUrl.trim() || undefined
           : undefined,
     });
-    return { repo: updated };
+    return c.json({ repo: updated });
   });
 
-  app.delete('/api/repos/:id', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
+  app.delete('/api/repos/:id', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    const repo = await getRepoById(id, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
     if (repo.ownerId !== authUser.id) {
-      return reply.code(403).send({ error: 'Only the owner can delete this repository' });
+      return c.json({ error: 'Only the owner can delete this repository' }, 403);
     }
-    deleteRepo(id);
-    return { ok: true };
+    await deleteRepo(id);
+    return c.json({ ok: true });
   });
 
   // ---- Purchase / Checkout -----------------------------------------------
 
-  app.post('/api/repos/:id/checkout', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
+  app.post('/api/repos/:id/checkout', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    const repo = await getRepoById(id, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
     if (repo.ownerId === authUser.id) {
-      return reply.code(400).send({ error: 'You cannot purchase your own repository' });
+      return c.json({ error: 'You cannot purchase your own repository' }, 400);
     }
     if (repo.pricingType === 'free') {
-      return reply.code(400).send({ error: 'This repository is free — no checkout required' });
+      return c.json({ error: 'This repository is free — no checkout required' }, 400);
     }
-    if (hasUserPurchasedRepo(authUser.id, id)) {
-      return reply.code(400).send({ error: 'You have already purchased this repository' });
+    if (await hasUserPurchasedRepo(authUser.id, id)) {
+      return c.json({ error: 'You have already purchased this repository' }, 400);
     }
     const platformFee = repo.price * PLATFORM_FEE_RATE;
-    const order = createOrder({
+    const order = await createOrder({
       buyerId: authUser.id,
       sellerId: repo.ownerId,
       repoId: id,
@@ -272,265 +320,281 @@ export async function registerRepoRoutes(app: FastifyInstance): Promise<void> {
       platformFee,
       sellerEarning: repo.price - platformFee,
     });
-    return reply.code(201).send({
-      order,
-      formattedTotal: formatPrice(order.totalAmount, order.currency),
-      platformFeeRate: PLATFORM_FEE_RATE,
-    });
+    return c.json(
+      {
+        order,
+        formattedTotal: formatPrice(order.totalAmount, order.currency),
+        platformFeeRate: PLATFORM_FEE_RATE,
+      },
+      201,
+    );
   });
 
-  app.post('/api/repos/:id/purchase-state', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
-    const isPurchased = hasUserPurchasedRepo(authUser.id, id);
-    return {
+  app.post('/api/repos/:id/purchase-state', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    const repo = await getRepoById(id, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
+    return c.json({
       isOwner: repo.ownerId === authUser.id,
-      isPurchased,
-      canReview: canUserReviewRepo(authUser.id, id),
-    };
+      isPurchased: await hasUserPurchasedRepo(authUser.id, id),
+      canReview: await canUserReviewRepo(authUser.id, id),
+    });
   });
 
   // ---- Files -------------------------------------------------------------
 
-  app.post('/api/repos/:id/files', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
+  app.post('/api/repos/:id/files', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    const repo = await getRepoById(id, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
     if (repo.ownerId !== authUser.id) {
-      return reply.code(403).send({ error: 'Only the owner can add files' });
+      return c.json({ error: 'Only the owner can add files' }, 403);
     }
 
-    const files: Array<{ buffer: Buffer; filename: string }> = [];
-    const fields: Record<string, string> = {};
-    for await (const part of req.parts()) {
-      if (part.type === 'file') {
-        files.push({ buffer: await part.toBuffer(), filename: part.filename ?? 'file' });
-      } else {
-        fields[part.fieldname] = String(part.value ?? '');
+    const form = await c.req.formData();
+    const files: File[] = [];
+    for (const value of form.values()) {
+      if (value instanceof File) files.push(value);
+    }
+    const description = String(form.get('description') ?? '').trim();
+    const rawPreview = String(form.get('isPreview') ?? '').toLowerCase();
+    const isPreview = rawPreview === '1' || rawPreview === 'true';
+    if (files.length === 0) return c.json({ error: 'Attach at least one file' }, 400);
+
+    const config = getConfig();
+    if (files.length > config.maxFilesPerRequest) {
+      return c.json({ error: `At most ${config.maxFilesPerRequest} files per upload` }, 400);
+    }
+
+    const created = [];
+    for (const file of files) {
+      if (file.size > config.maxFileBytes) {
+        return c.json(
+          { error: `Each file must be ${Math.round(config.maxFileBytes / 1024 / 1024)}MB or smaller` },
+          413,
+        );
+      }
+      const ext = file.name.includes('.') ? `.${file.name.split('.').pop()}` : '';
+      const key = `${crypto.randomUUID()}${ext}`;
+      const buffer = await file.arrayBuffer();
+      await putUpload(key, buffer, file.type || 'application/octet-stream');
+      try {
+        created.push(
+          await addFileToRepo({
+            repoId: id,
+            title: file.name || 'file',
+            description,
+            fileType: inferFileType(file.name),
+            fileSize: formatBytes(file.size),
+            fileBytes: file.size,
+            filePath: `/uploads/${key}`,
+            isPreview,
+          }),
+        );
+      } catch (error) {
+        await deleteUpload(`/uploads/${key}`);
+        throw error;
       }
     }
-    const description = (fields.description ?? '').trim();
-    const isPreview = fields.isPreview === '1' || fields.isPreview?.toLowerCase() === 'true';
-    if (files.length === 0) return reply.code(400).send({ error: 'Attach at least one file' });
-
-    const created: RepoFile[] = [];
-    for (const file of files) {
-      const storedName = `${randomUUID()}${path.extname(file.filename)}`;
-      await fs.promises.writeFile(path.join(config.uploadDir, storedName), file.buffer);
-      created.push(
-        addFileToRepo({
-          repoId: id,
-          title: file.filename,
-          description,
-          fileType: inferFileType(file.filename),
-          fileSize: formatBytes(file.buffer.length),
-          fileBytes: file.buffer.length,
-          filePath: `/uploads/${storedName}`,
-          isPreview,
-        }),
-      );
-    }
-    return reply.code(201).send({ files: created, repo: getRepoById(id, authUser.id, false) });
+    return c.json({ files: created, repo: await getRepoById(id, authUser.id, false) }, 201);
   });
 
-  app.get('/api/files/:id/download', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const file = getRepoFileById(id);
-    if (!file) return reply.code(404).send({ error: 'File not found' });
-    const repo = getRepoById(file.repoId, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
+  app.get('/api/files/:id/download', async (c) => {
+    const { id } = c.req.param();
+    const file = await getRepoFileById(id);
+    if (!file) return c.json({ error: 'File not found' }, 404);
+    const repo = await getRepoById(file.repoId, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
 
-    const isOwner = req.authUser?.id === repo.ownerId;
-    const isPurchased = req.authUser ? hasUserPurchasedRepo(req.authUser.id, repo.id) : false;
+    const authUser = c.get('authUser');
+    const isOwner = authUser?.id === repo.ownerId;
+    const isPurchased = authUser ? await hasUserPurchasedRepo(authUser.id, repo.id) : false;
     const isFree = repo.pricingType === 'free';
     const canDownload = isOwner || isPurchased || isFree || file.isPreview;
 
     if (!canDownload) {
-      return reply
-        .code(403)
-        .send({ error: 'Purchase required to download this file', requiresPurchase: true });
+      return c.json({ error: 'Purchase required to download this file', requiresPurchase: true }, 403);
     }
 
-    const filePath = path.join(config.uploadDir, path.basename(file.filePath));
-    if (!fs.existsSync(filePath)) return reply.code(404).send({ error: 'File is missing on the server' });
-    incrementFileDownload(id);
+    const object = await getUpload(uploadKey(file.filePath));
+    if (!object) return c.json({ error: 'File is missing on the server' }, 404);
+    await incrementFileDownload(id);
     const safeTitle = file.title.replace(/[^\w\s.-]/g, '').replace(/\s+/g, '_');
-    return reply
-      .header('Content-Type', 'application/octet-stream')
-      .header('Content-Disposition', `attachment; filename="${safeTitle}"`)
-      .send(fs.createReadStream(filePath));
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${safeTitle}"`,
+      },
+    });
   });
 
   // ---- Comments ----------------------------------------------------------
 
-  app.get('/api/repos/:id/comments', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
-    return { items: listRepoComments(id) };
+  app.get('/api/repos/:id/comments', async (c) => {
+    const { id } = c.req.param();
+    if (!(await getRepoById(id, null, false))) {
+      return c.json({ error: 'Repository not found' }, 404);
+    }
+    return c.json({ items: await listRepoComments(id) });
   });
 
-  app.post('/api/repos/:id/comments', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
-    const content = ((req.body as { content?: string } | undefined)?.content ?? '').trim();
-    if (!content) return reply.code(400).send({ error: 'Comment cannot be empty' });
-    if (content.length > 2000) return reply.code(400).send({ error: 'Comment is too long' });
-    const comment = createRepoComment(id, authUser.id, content);
-    return reply.code(201).send({ comment });
+  app.post('/api/repos/:id/comments', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if (!(await getRepoById(id, null, false))) {
+      return c.json({ error: 'Repository not found' }, 404);
+    }
+    const body = await readJson<{ content?: string }>(c);
+    const content = (body.content ?? '').trim();
+    if (!content) return c.json({ error: 'Comment cannot be empty' }, 400);
+    if (content.length > 2000) return c.json({ error: 'Comment is too long' }, 400);
+    return c.json({ comment: await createRepoComment(id, authUser.id, content) }, 201);
   });
 
   // ---- Reviews -----------------------------------------------------------
 
-  app.get('/api/repos/:id/reviews', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
-    return { items: listRepoReviews(id) };
+  app.get('/api/repos/:id/reviews', async (c) => {
+    const { id } = c.req.param();
+    if (!(await getRepoById(id, null, false))) {
+      return c.json({ error: 'Repository not found' }, 404);
+    }
+    return c.json({ items: await listRepoReviews(id) });
   });
 
-  app.post('/api/repos/:id/reviews', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
-    if (!canUserReviewRepo(authUser.id, id)) {
-      return reply.code(403).send({
-        error: 'You must purchase (or be the owner of a free repository) before reviewing',
-      });
+  app.post('/api/repos/:id/reviews', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if (!(await getRepoById(id, null, false))) {
+      return c.json({ error: 'Repository not found' }, 404);
     }
-    const body = (req.body ?? {}) as { rating?: number; title?: string; content?: string };
+    if (!(await canUserReviewRepo(authUser.id, id))) {
+      return c.json(
+        { error: 'You must purchase (or be the owner of a free repository) before reviewing' },
+        403,
+      );
+    }
+    const body = await readJson<{ rating?: number; title?: string; content?: string }>(c);
     const rating = Number(body.rating) as ReviewRating;
     if (![1, 2, 3, 4, 5].includes(rating)) {
-      return reply.code(400).send({ error: 'rating must be 1–5' });
+      return c.json({ error: 'rating must be 1–5' }, 400);
     }
-    const title = (body.title ?? '').trim().slice(0, 120);
-    const content = (body.content ?? '').trim().slice(0, 2000);
-    const review = createReview({
+    const review = await createReview({
       userId: authUser.id,
       repoId: id,
       rating,
-      title,
-      content,
+      title: (body.title ?? '').trim().slice(0, 120),
+      content: (body.content ?? '').trim().slice(0, 2000),
     });
-    return reply.code(201).send({ review });
+    return c.json({ review }, 201);
   });
 
-  app.patch('/api/repos/:id/reviews/:reviewId', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { reviewId } = req.params as { reviewId: string };
-    const body = (req.body ?? {}) as { rating?: number; title?: string; content?: string };
+  app.patch('/api/repos/:id/reviews/:reviewId', async (c) => {
+    const authUser = await requireAuth(c);
+    const { reviewId } = c.req.param();
+    const body = await readJson<{ rating?: number; title?: string; content?: string }>(c);
     const rating = body.rating !== undefined ? (Number(body.rating) as ReviewRating) : undefined;
     if (rating !== undefined && ![1, 2, 3, 4, 5].includes(rating)) {
-      return reply.code(400).send({ error: 'rating must be 1–5' });
+      return c.json({ error: 'rating must be 1–5' }, 400);
     }
-    const review = updateReview(reviewId, {
+    const review = await updateReview(reviewId, {
       rating,
       title: body.title !== undefined ? body.title.trim().slice(0, 120) : undefined,
       content: body.content !== undefined ? body.content.trim().slice(0, 2000) : undefined,
     });
-    if (!review) return reply.code(404).send({ error: 'Review not found' });
+    if (!review) return c.json({ error: 'Review not found' }, 404);
     if (review.userId !== authUser.id) {
-      return reply.code(403).send({ error: 'Only the author can edit this review' });
+      return c.json({ error: 'Only the author can edit this review' }, 403);
     }
-    return { review };
+    return c.json({ review });
   });
 
-  app.delete('/api/repos/:id/reviews/:reviewId', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { reviewId } = req.params as { reviewId: string };
-    const body = { id: reviewId };
-    const _ = body;
-    deleteReview(reviewId);
-    return { ok: true };
+  app.delete('/api/repos/:id/reviews/:reviewId', async (c) => {
+    const authUser = await requireAuth(c);
+    const { reviewId } = c.req.param();
+    const review = await getReviewById(reviewId);
+    if (!review) return c.json({ error: 'Review not found' }, 404);
+    if (review.userId !== authUser.id) {
+      return c.json({ error: 'Only the author can delete this review' }, 403);
+    }
+    await deleteReview(reviewId);
+    return c.json({ ok: true });
   });
 
   // ---- Favorites ---------------------------------------------------------
 
-  app.post('/api/repos/:id/favorite', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
-    const favorited = toggleFavoriteRepo(id, authUser.id);
-    return { favorited, repo: getRepoById(id, authUser.id, false) };
+  app.post('/api/repos/:id/favorite', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if (!(await getRepoById(id, null, false))) {
+      return c.json({ error: 'Repository not found' }, 404);
+    }
+    const favorited = await toggleFavoriteRepo(id, authUser.id);
+    return c.json({ favorited, repo: await getRepoById(id, authUser.id, false) });
   });
 
-  app.delete('/api/repos/:id/favorite', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    toggleFavoriteRepo(id, authUser.id);
-    return { favorited: false, repo: getRepoById(id, authUser.id, false) };
+  app.delete('/api/repos/:id/favorite', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    await toggleFavoriteRepo(id, authUser.id);
+    return c.json({ favorited: false, repo: await getRepoById(id, authUser.id, false) });
   });
 
   // ---- Sharing into groups ----------------------------------------------
 
-  app.post('/api/repos/:id/groups', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const body = (req.body ?? {}) as { groupId?: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
+  app.post('/api/repos/:id/groups', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    const body = await readJson<{ groupId?: string }>(c);
+    const repo = await getRepoById(id, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
     if (repo.ownerId !== authUser.id) {
-      return reply.code(403).send({ error: 'Only the owner can share this repository' });
+      return c.json({ error: 'Only the owner can share this repository' }, 403);
     }
-    if (!body.groupId) return reply.code(400).send({ error: 'groupId is required' });
-    if (!groupRole(body.groupId, authUser.id)) {
-      return reply.code(400).send({ error: 'Join the group before sharing a repository to it' });
+    if (!body.groupId) return c.json({ error: 'groupId is required' }, 400);
+    if (!(await groupRole(body.groupId, authUser.id))) {
+      return c.json({ error: 'Join the group before sharing a repository to it' }, 400);
     }
-    shareRepoToGroup(id, body.groupId);
-    return { repo: getRepoById(id, authUser.id, false) };
+    await shareRepoToGroup(id, body.groupId);
+    return c.json({ repo: await getRepoById(id, authUser.id, false) });
   });
 
-  app.delete('/api/repos/:id/groups/:groupId', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id, groupId } = req.params as { id: string; groupId: string };
-    const repo = getRepoById(id, null, false);
-    if (!repo) return reply.code(404).send({ error: 'Repository not found' });
+  app.delete('/api/repos/:id/groups/:groupId', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id, groupId } = c.req.param();
+    const repo = await getRepoById(id, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
     if (repo.ownerId !== authUser.id) {
-      return reply.code(403).send({ error: 'Only the owner can unshare this repository' });
+      return c.json({ error: 'Only the owner can unshare this repository' }, 403);
     }
-    unshareRepoFromGroup(id, groupId);
-    return { repo: getRepoById(id, authUser.id, false) };
+    await unshareRepoFromGroup(id, groupId);
+    return c.json({ repo: await getRepoById(id, authUser.id, false) });
   });
 
   // ---- Pay order directly (convenience endpoint under repo) -------------
 
-  app.post('/api/orders/:orderId/pay', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { orderId } = req.params as { orderId: string };
-    const order = getOrderById(orderId);
-    if (!order) return reply.code(404).send({ error: 'Order not found' });
+  app.post('/api/orders/:orderId/pay', async (c) => {
+    const authUser = await requireAuth(c);
+    const { orderId } = c.req.param();
+    const order = await getOrderById(orderId);
+    if (!order) return c.json({ error: 'Order not found' }, 404);
     if (order.buyerId !== authUser.id) {
-      return reply.code(403).send({ error: 'Only the buyer can pay this order' });
+      return c.json({ error: 'Only the buyer can pay this order' }, 403);
     }
     if (order.status !== 'pending') {
-      return reply.code(400).send({ error: `Order is already ${order.status}` });
+      return c.json({ error: `Order is already ${order.status}` }, 400);
     }
-    const result = payOrderWithWallet(orderId, authUser.id);
+    const result = await payOrderWithWallet(orderId, authUser.id);
     if (!result.success) {
-      return reply.code(400).send({ error: result.error, code: result.code });
+      return c.json({ error: result.error, code: result.code }, 400);
     }
-    return reply.code(200).send({
+    return c.json({
       order: result.order,
       purchase: result.purchase,
-      formattedTotal: result.order ? formatPrice(result.order.totalAmount, result.order.currency) : undefined,
+      formattedTotal: result.order
+        ? formatPrice(result.order.totalAmount, result.order.currency)
+        : undefined,
     });
   });
 }

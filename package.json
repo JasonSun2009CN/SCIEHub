@@ -7,14 +7,19 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n server,web -c cyan,magenta \"npm run dev -w @sciehub/server\" \"npm run dev -w @sciehub/web\"",
-    "build": "npm run build -w @sciehub/shared && npm run build -w @sciehub/server && npm run build -w @sciehub/web",
-    "prestart": "npm run build",
-    "start": "npm run start -w @sciehub/server",
-    "deploy": "npm run build && npm run start -w @sciehub/server",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "predev": "npm run build -w @sciehub/shared && npm run build -w @sciehub/web && npm run db:migrate:local",
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev:api\" \"npm run dev -w @sciehub/web\"",
+    "dev:api": "wrangler dev",
+    "build": "npm run build -w @sciehub/shared && npm run build -w @sciehub/web",
+    "start": "wrangler dev",
+    "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy",
+    "deploy:ci": "npm run db:migrate:remote && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply sciehub --local",
+    "db:migrate:remote": "wrangler d1 migrations apply sciehub --remote",
+    "typecheck": "npm run build -w @sciehub/shared && npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "wrangler": "^4.156.0"
   }
 }

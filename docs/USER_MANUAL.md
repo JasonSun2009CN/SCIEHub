@@ -29,13 +29,15 @@ SCIEHub 是面向国际高中生的**学习资源共享/售卖市场**。你可�
 
 ## 2. 浏览与搜索资源
 
-- 顶部导航 **Marketplace**（或首页 **Browse marketplace**）进入资源市场 `/marketplace`。
+- 顶部导航 **Marketplace** 进入全部资源；**Free** 进入免费专区 `/free`；**Paid** 进入付费专区 `/paid`。
 - 支持：
   - **关键词搜索**：顶部搜索框输入关键词（标题、描述、标签）。
-  - **分类筛选**：Mathematics / Physics / Chemistry / Computer Science 等。
-  - **定价筛选**：All pricing / Free only / Paid only。
+  - **Level 筛选**：IGCSE / IG、AS、A Level、IB、AP、Other。
+  - **Subject 筛选**：Mathematics、Further Mathematics、Physics、Chemistry、Biology、English Literature / Language、Chinese、Computer Science、History、Geography、Economics、Business、Psychology 等。
+  - **Resource type 筛选**：Notes（笔记）、Practice Questions（练习题）、Past Papers（past paper）、Other。
+  - **定价筛选**（全部资源页）：All pricing / Free only / Paid only。
   - **排序**：Most recent（最新）、Most downloaded（下载最多）、Most viewed（浏览最多）、Most sold（销量最高）、Top rated（评分最高）、Price: low→high / high→low（价格）。
-- 资源卡片会显示**价格或 "Free" 徽章**、销量、评分等信息。
+- 资源卡片会显示**价格或 "Free" 徽章**、Level、资源类型、销量、评分等信息。
 
 ## 3. 下载免费资源
 
@@ -45,14 +47,14 @@ SCIEHub 是面向国际高中生的**学习资源共享/售卖市场**。你可�
 ## 4. 发布资源(免费或标价)
 
 1. 点击右上角 **Upload & Sell** 进入 `/upload`。
-2. 填写仓库信息：名称、描述、分类、标签；可分享到自己的小组。
+2. 填写仓库信息：名称、描述、**Level**（IG / AS / A Level / IB / AP）、**Subject**（学科）、**Resource type**（Notes / Practice Questions / Past Papers）、标签；可分享到自己的小组。
 3. **定价**：
    - 选 **Free download**：所有人免费下载。
    - 选 **Paid resource**：输入价格（0.01 – 9,999）与币种（¥ CNY / $ USD）。
 4. 拖拽或选择文件（可多个），逐个显示上传进度。
 5. 上传成功后进入资源详情页。
 
-> 之后可以随时在资源详情页点 **Edit** 修改名称、描述、分类、标签、**定价**和预览图 URL。
+> 之后可以随时在资源详情页点 **Edit** 修改名称、描述、Level、Subject、Resource type、标签、**定价**和预览图 URL。
 
 ### 平台费用
 

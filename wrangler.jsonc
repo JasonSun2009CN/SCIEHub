@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sciehub",
+  "main": "packages/server/src/worker.ts",
+  "workers_dev": true,
+  "compatibility_date": "2026-10-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./packages/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/uploads/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sciehub",
+      "database_id": "4cf2b2c9-f98e-4bcc-b8a5-e18ac17bcbd1",
+      "migrations_dir": "packages/server/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "UPLOADS",
+      "bucket_name": "sciehub-uploads"
+    }
+  ],
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+  "vars": {
+    "SCIEHUB_MAX_FILE_MB": "50",
+    "SCIEHUB_MAX_FILES": "8"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

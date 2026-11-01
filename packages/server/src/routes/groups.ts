@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { Hono } from 'hono';
 import { CATEGORIES } from '@sciehub/shared';
 import { requireAuth } from '../auth.js';
 import {
@@ -17,154 +17,143 @@ import {
   requestToJoin,
   updateGroup,
 } from '../db.js';
+import { readJson } from '../http.js';
+import type { AppEnv } from '../types.js';
 
-export async function registerGroupRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/groups', async (req) => {
-    const q = req.query as Record<string, string | undefined>;
-    const limit = Math.min(Math.max(Number(q.limit) || 20, 1), 100);
-    const offset = Math.max(Number(q.offset) || 0, 0);
-    const items = listGroups(
+export function registerGroupRoutes(app: Hono<AppEnv>): void {
+  app.get('/api/groups', async (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 20, 1), 100);
+    const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
+    const items = await listGroups(
       {
-        search: q.search,
-        category: q.category,
-        sort: (q.sort as 'members' | 'repos' | 'recent') ?? 'recent',
+        search: c.req.query('search'),
+        category: c.req.query('category'),
+        sort: (c.req.query('sort') as 'members' | 'repos' | 'recent') ?? 'recent',
         limit,
         offset,
       },
-      req.authUser?.id ?? null,
+      c.get('authUser')?.id ?? null,
     );
-    return { items, total: items.length };
+    return c.json({ items, total: items.length });
   });
 
-  app.get('/api/groups/:id', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const group = getGroupById(id, req.authUser?.id ?? null);
-    if (!group) return reply.code(404).send({ error: 'Group not found' });
-    return { group };
+  app.get('/api/groups/:id', async (c) => {
+    const { id } = c.req.param();
+    const group = await getGroupById(id, c.get('authUser')?.id ?? null);
+    if (!group) return c.json({ error: 'Group not found' }, 404);
+    return c.json({ group });
   });
 
-  app.get('/api/groups/:id/members', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const group = getGroupById(id, null);
-    if (!group) return reply.code(404).send({ error: 'Group not found' });
-    return { items: listGroupMembers(id) };
+  app.get('/api/groups/:id/members', async (c) => {
+    const { id } = c.req.param();
+    if (!(await getGroupById(id, null))) return c.json({ error: 'Group not found' }, 404);
+    return c.json({ items: await listGroupMembers(id) });
   });
 
-  app.get('/api/groups/:id/repos', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const group = getGroupById(id, null);
-    if (!group) return reply.code(404).send({ error: 'Group not found' });
-    return { items: listReposInGroup(id, req.authUser?.id ?? null) };
+  app.get('/api/groups/:id/repos', async (c) => {
+    const { id } = c.req.param();
+    if (!(await getGroupById(id, null))) return c.json({ error: 'Group not found' }, 404);
+    return c.json({ items: await listReposInGroup(id, c.get('authUser')?.id ?? null) });
   });
 
-  app.get('/api/groups/:id/requests', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    if (groupRole(id, authUser.id) !== 'admin') {
-      return reply.code(403).send({ error: 'Only the group creator can review requests' });
+  app.get('/api/groups/:id/requests', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if ((await groupRole(id, authUser.id)) !== 'admin') {
+      return c.json({ error: 'Only the group creator can review requests' }, 403);
     }
-    return { items: listGroupRequests(id) };
+    return c.json({ items: await listGroupRequests(id) });
   });
 
-  app.post('/api/groups/:id/join', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const group = getGroupById(id, null);
-    if (!group) return reply.code(404).send({ error: 'Group not found' });
-    const outcome = requestToJoin(id, authUser.id);
-    if (outcome === 'already-member') {
-      return { group: getGroupById(id, authUser.id), requestStatus: 'member' };
+  app.post('/api/groups/:id/join', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if (!(await getGroupById(id, null))) return c.json({ error: 'Group not found' }, 404);
+    const outcome = await requestToJoin(id, authUser.id);
+    return c.json({
+      group: await getGroupById(id, authUser.id),
+      requestStatus: outcome === 'already-member' ? 'member' : 'pending',
+    });
+  });
+
+  app.post('/api/groups/:id/requests/:requestId/approve', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id, requestId } = c.req.param();
+    if ((await groupRole(id, authUser.id)) !== 'admin') {
+      return c.json({ error: 'Only the group creator can approve requests' }, 403);
     }
-    return { group: getGroupById(id, authUser.id), requestStatus: 'pending' };
+    const request = await getGroupRequestById(requestId);
+    if (!request || request.groupId !== id) return c.json({ error: 'Request not found' }, 404);
+    if (request.status !== 'pending') return c.json({ error: 'Request is no longer pending' }, 400);
+    await approveRequest(requestId);
+    return c.json({ ok: true, request: await getGroupRequestById(requestId) });
   });
 
-  app.post('/api/groups/:id/requests/:requestId/approve', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id, requestId } = req.params as { id: string; requestId: string };
-    if (groupRole(id, authUser.id) !== 'admin') {
-      return reply.code(403).send({ error: 'Only the group creator can approve requests' });
+  app.post('/api/groups/:id/requests/:requestId/reject', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id, requestId } = c.req.param();
+    if ((await groupRole(id, authUser.id)) !== 'admin') {
+      return c.json({ error: 'Only the group creator can reject requests' }, 403);
     }
-    const request = getGroupRequestById(requestId);
-    if (!request || request.groupId !== id) return reply.code(404).send({ error: 'Request not found' });
-    if (request.status !== 'pending') return reply.code(400).send({ error: 'Request is no longer pending' });
-    approveRequest(requestId);
-    return { ok: true, request: getGroupRequestById(requestId) };
+    const request = await getGroupRequestById(requestId);
+    if (!request || request.groupId !== id) return c.json({ error: 'Request not found' }, 404);
+    if (request.status !== 'pending') return c.json({ error: 'Request is no longer pending' }, 400);
+    await rejectRequest(requestId);
+    return c.json({ ok: true, request: await getGroupRequestById(requestId) });
   });
 
-  app.post('/api/groups/:id/requests/:requestId/reject', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id, requestId } = req.params as { id: string; requestId: string };
-    if (groupRole(id, authUser.id) !== 'admin') {
-      return reply.code(403).send({ error: 'Only the group creator can reject requests' });
+  app.delete('/api/groups/:id/members', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if (!(await getGroupById(id, null))) return c.json({ error: 'Group not found' }, 404);
+    if ((await groupRole(id, authUser.id)) === 'admin') {
+      return c.json({ error: 'Admins cannot leave a group; delete it instead' }, 400);
     }
-    const request = getGroupRequestById(requestId);
-    if (!request || request.groupId !== id) return reply.code(404).send({ error: 'Request not found' });
-    if (request.status !== 'pending') return reply.code(400).send({ error: 'Request is no longer pending' });
-    rejectRequest(requestId);
-    return { ok: true, request: getGroupRequestById(requestId) };
+    await leaveGroup(id, authUser.id);
+    return c.json({ group: await getGroupById(id, authUser.id) });
   });
 
-  app.delete('/api/groups/:id/members', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    const group = getGroupById(id, null);
-    if (!group) return reply.code(404).send({ error: 'Group not found' });
-    if (groupRole(id, authUser.id) === 'admin') {
-      return reply.code(400).send({ error: 'Admins cannot leave a group; delete it instead' });
-    }
-    leaveGroup(id, authUser.id);
-    return { group: getGroupById(id, authUser.id) };
-  });
-
-  app.post('/api/groups', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const body = (req.body ?? {}) as { name?: string; description?: string; categoryId?: string };
+  app.post('/api/groups', async (c) => {
+    const authUser = await requireAuth(c);
+    const body = await readJson<{ name?: string; description?: string; categoryId?: string }>(c);
     const name = body.name?.trim() ?? '';
     if (name.length < 2 || name.length > 60) {
-      return reply.code(400).send({ error: 'Group name must be 2–60 characters' });
+      return c.json({ error: 'Group name must be 2–60 characters' }, 400);
     }
-    if (!body.categoryId || !CATEGORIES.some((c) => c.id === body.categoryId)) {
-      return reply.code(400).send({ error: 'Please choose a valid category' });
+    if (!body.categoryId || !CATEGORIES.some((category) => category.id === body.categoryId)) {
+      return c.json({ error: 'Please choose a valid category' }, 400);
     }
-    const group = createGroup({
+    const group = await createGroup({
       name,
       description: body.description?.trim() ?? '',
       categoryId: body.categoryId,
       creatorId: authUser.id,
     });
-    return reply.code(201).send({ group });
+    return c.json({ group }, 201);
   });
 
-  app.patch('/api/groups/:id', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    if (groupRole(id, authUser.id) !== 'admin') {
-      return reply.code(403).send({ error: 'Only the group creator can edit this group' });
+  app.patch('/api/groups/:id', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if ((await groupRole(id, authUser.id)) !== 'admin') {
+      return c.json({ error: 'Only the group creator can edit this group' }, 403);
     }
-    const body = (req.body ?? {}) as { name?: string; description?: string; categoryId?: string };
-    const group = updateGroup(id, {
+    const body = await readJson<{ name?: string; description?: string; categoryId?: string }>(c);
+    const group = await updateGroup(id, {
       name: typeof body.name === 'string' ? body.name.trim() : undefined,
       description: typeof body.description === 'string' ? body.description.trim() : undefined,
       categoryId: body.categoryId,
     });
-    return { group };
+    return c.json({ group });
   });
 
-  app.delete('/api/groups/:id', async (req, reply) => {
-    const authUser = requireAuth(req, reply);
-    if (!authUser) return;
-    const { id } = req.params as { id: string };
-    if (groupRole(id, authUser.id) !== 'admin') {
-      return reply.code(403).send({ error: 'Only the group creator can delete this group' });
+  app.delete('/api/groups/:id', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    if ((await groupRole(id, authUser.id)) !== 'admin') {
+      return c.json({ error: 'Only the group creator can delete this group' }, 403);
     }
-    deleteGroup(id);
-    return { ok: true };
+    await deleteGroup(id);
+    return c.json({ ok: true });
   });
 }

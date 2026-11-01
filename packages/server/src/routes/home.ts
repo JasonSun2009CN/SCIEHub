@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { Hono } from 'hono';
 import type { HomeData } from '@sciehub/shared';
 import {
   getLeaderboard,
@@ -10,33 +10,33 @@ import {
   listRecentRepos,
   searchAll,
 } from '../db.js';
+import type { AppEnv } from '../types.js';
 
-export async function registerHomeRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/home', async (req) => {
-    const currentUserId = req.authUser?.id ?? null;
+export function registerHomeRoutes(app: Hono<AppEnv>): void {
+  app.get('/api/home', async (c) => {
+    const currentUserId = c.get('authUser')?.id ?? null;
     const data: HomeData = {
-      stats: getStats(),
-      hotRepos: listHotRepos(6, currentUserId),
-      activeGroups: listActiveGroups(6, currentUserId),
-      recentRepos: listRecentRepos(6, currentUserId),
-      topContributors: getLeaderboard(5),
-      topSellers: getTopSellers(5),
-      freeRepos: listFreeRepos(6, currentUserId),
+      stats: await getStats(),
+      hotRepos: await listHotRepos(6, currentUserId),
+      activeGroups: await listActiveGroups(6, currentUserId),
+      recentRepos: await listRecentRepos(6, currentUserId),
+      topContributors: await getLeaderboard(5),
+      topSellers: await getTopSellers(5),
+      freeRepos: await listFreeRepos(6, currentUserId),
     };
-    return data;
+    return c.json(data);
   });
 
-  app.get('/api/leaderboard', async (req) => {
-    const q = req.query as Record<string, string | undefined>;
-    const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 100);
-    const type = q.type === 'sales' ? 'sales' : 'contributors';
-    const items = type === 'sales' ? getTopSellers(limit) : getLeaderboard(limit);
-    return { items, type };
+  app.get('/api/leaderboard', async (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 50, 1), 100);
+    const type = c.req.query('type') === 'sales' ? 'sales' : 'contributors';
+    const items = type === 'sales' ? await getTopSellers(limit) : await getLeaderboard(limit);
+    return c.json({ items, type });
   });
 
-  app.get('/api/search', async (req, reply) => {
-    const q = ((req.query as Record<string, string | undefined>).q ?? '').trim();
-    if (!q) return { repos: [], groups: [] };
-    return searchAll(q, req.authUser?.id ?? null);
+  app.get('/api/search', async (c) => {
+    const q = (c.req.query('q') ?? '').trim();
+    if (!q) return c.json({ repos: [], groups: [] });
+    return c.json(await searchAll(q, c.get('authUser')?.id ?? null));
   });
 }
