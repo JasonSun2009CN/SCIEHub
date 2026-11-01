@@ -19,6 +19,7 @@ import {
   createRepo,
   createRepoComment,
   createReview,
+  deleteFileById,
   deleteRepo,
   deleteReview,
   getRepoById,
@@ -402,6 +403,25 @@ export function registerRepoRoutes(app: Hono<AppEnv>): void {
       }
     }
     return c.json({ files: created, repo: await getRepoById(id, authUser.id, false) }, 201);
+  });
+
+  app.delete('/api/files/:id', async (c) => {
+    const authUser = await requireAuth(c);
+    const { id } = c.req.param();
+    const file = await getRepoFileById(id);
+    if (!file) return c.json({ error: 'File not found' }, 404);
+    const repo = await getRepoById(file.repoId, null, false);
+    if (!repo) return c.json({ error: 'Repository not found' }, 404);
+    if (repo.ownerId !== authUser.id) {
+      return c.json({ error: 'Only the owner can delete this file' }, 403);
+    }
+    const account = await getUserById(authUser.id);
+    const permission = repo.pricingType === 'paid' ? 'canPublishPaid' : 'canPublishFree';
+    if (!account?.[permission]) {
+      return c.json({ error: 'Publishing is disabled for this account' }, 403);
+    }
+    await deleteFileById(id);
+    return c.json({ ok: true });
   });
 
   app.get('/api/files/:id/download', async (c) => {

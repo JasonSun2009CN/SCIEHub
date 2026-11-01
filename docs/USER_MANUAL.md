@@ -34,7 +34,7 @@ SCIEHub 是面向国际高中生的**免费优先学习资料库 + 社区**。�
 - 支持：
   - **关键词搜索**：顶部搜索框输入关键词（标题、描述、标签）。
   - **Level 筛选**：IGCSE / IG、AS、A Level、IB、AP、Other。
-  - **Subject 筛选**：Mathematics、Further Mathematics、Physics、Chemistry、Biology、English Literature / Language、Chinese、Computer Science、History、Geography、Economics、Business、Psychology 等。
+  - **Subject 筛选**：Mathematics、Further Mathematics、Physics、Chemistry、Biology、English Literature、English Language、Chinese、Computer Science、History、Geography、Economics、Business、Psychology 等。
   - **Resource type 筛选**：Notes（笔记）、Practice Questions（练习题）、Past Papers（past paper）、Other。
   - **定价筛选**（全部资源页）：All pricing / Free only / Paid only。
   - **排序**：Most recent（最新）、Most downloaded（下载最多）、Most viewed（浏览最多）、Most sold（销量最高）、Top rated（评分最高）、Price: low→high / high→low（价格）。
@@ -58,6 +58,8 @@ SCIEHub 是面向国际高中生的**免费优先学习资料库 + 社区**。�
 6. 上传成功后进入资源详情页。
 
 > 之后可以随时在资源详情页点 **Edit** 修改名称、描述、Level、Subject、Resource type、标签、匿名状态、定价和预览图 URL。
+>
+> **文件传错了**：资源详情页 → Files 列表 → 文件右侧的删除按钮；删除后在资源详情页点 **Upload files** 重新上传正确文件。删除会同时移除 R2 中的文件，无法恢复。
 
 ## 5. 付费资源：联系卖家，站外交易
 

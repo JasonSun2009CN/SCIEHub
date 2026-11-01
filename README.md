@@ -19,7 +19,7 @@ A free-first **study-resource library and community** for international high sch
 
 ### Free-first marketplace
 - **Free-first shelves** — `/free` is the main shelf; `/marketplace` shows everything and `/paid` is the optional paid shelf. Free resources download without checkout.
-- **Curriculum taxonomy** — resources are classified by level (**IGCSE / IG, AS, A Level, IB, AP**), subject (Math, English Literature/Language, Physics, Biology, Computer Science, Chinese, History, Chemistry, Economics, Business, Psychology…), and resource type (**Notes, Practice Questions, Past Papers**).
+- **Curriculum taxonomy** — resources are classified by level (**IGCSE / IG, AS, A Level, IB, AP**), subject (Math, English Literature, English Language, Physics, Biology, Computer Science, Chinese, History, Chemistry, Economics, Business, Psychology…), and resource type (**Notes, Practice Questions, Past Papers**).
 - **Anonymous or named publishing** — free resources can be published under your username or anonymously. Anonymous listings hide the publisher identity.
 - **Paid = contact request, not checkout** — a paid listing sends the seller a purchase request containing the buyer's account email. The seller arranges payment and delivery with the buyer on another platform; SCIEHub does not process the transaction.
 - **Reviews** — owners of free resources and buyers whose request was completed can rate a repository 1–5 stars.
@@ -27,7 +27,7 @@ A free-first **study-resource library and community** for international high sch
 
 ### Community & sharing
 - **The Commons** — `/community` is a shared public board where every signed-in user can post questions, tips and resource requests, anonymously or by username. Posts refresh automatically.
-- **Repositories** — users create repos (name, description, level, subject, resource type, tags) and upload multiple files into them.
+- **Repositories** — users create repos (name, description, level, subject, resource type, tags) and upload multiple files into them. Owners can edit metadata/tags, delete a wrong file, and re-upload a replacement.
 - **Feed & search** — browse by level, subject, resource type, price, rating and full-text search.
 - **Study groups** — join groups by **requesting membership**; the group creator approves or rejects each request. Groups collect repositories shared into them.
 - **Sharing** — a repo owner can share a repository into any group they belong to (and remove it again).

@@ -62,6 +62,7 @@ import { UserAvatar } from '@/components/generated/UserAvatar';
 import { FileTypeIcon } from '@/components/generated/FileTypeIcon';
 import { TagInput } from '@/components/common/TagInput';
 import { ReportDialog } from '@/components/common/ReportDialog';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/common/Toast';
 import { cn, formatDate, formatNumber, timeAgo } from '@/lib/utils';
@@ -97,6 +98,7 @@ export function RepoDetailPage() {
   const [editPreviewImageUrl, setEditPreviewImageUrl] = useState('');
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestMessage, setRequestMessage] = useState('');
+  const [fileToDelete, setFileToDelete] = useState<RepoFile | null>(null);
   // Review form
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState('');
@@ -221,6 +223,17 @@ export function RepoDetailPage() {
       toast('Request sent — the seller can now see your email.', 'success');
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not send request', 'error'),
+  });
+
+  const fileDeleteMutation = useMutation({
+    mutationFn: (fileId: string) => api(`/files/${fileId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setFileToDelete(null);
+      invalidateRepo();
+      queryClient.invalidateQueries({ queryKey: ['home'] });
+      toast('File deleted', 'info');
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not delete file', 'error'),
   });
 
   const reviewMutation = useMutation({
@@ -566,6 +579,17 @@ export function RepoDetailPage() {
                       >
                         <FaDownload className="h-4 w-4" />
                       </a>
+                    )}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setFileToDelete(file)}
+                        className="shrink-0 cursor-pointer rounded-md border border-border p-2 text-muted-foreground transition-colors hover:border-error/50 hover:text-error"
+                        aria-label={`Delete ${file.title}`}
+                        title="Delete this file"
+                      >
+                        <FaTrash className="h-4 w-4" />
+                      </button>
                     )}
                   </li>
                 ))}
@@ -1258,6 +1282,16 @@ export function RepoDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(fileToDelete)}
+        onOpenChange={(open) => !open && setFileToDelete(null)}
+        title={`Delete “${fileToDelete?.title ?? 'file'}”?`}
+        description="This removes the file from the repository and deletes it from storage. This cannot be undone."
+        confirmLabel="Delete file"
+        busy={fileDeleteMutation.isPending}
+        onConfirm={() => fileToDelete && fileDeleteMutation.mutate(fileToDelete.id)}
+      />
     </div>
   );
 }
