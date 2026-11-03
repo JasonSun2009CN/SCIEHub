@@ -3,7 +3,7 @@
 export type FileType = 'pdf' | 'doc' | 'ppt' | 'image' | 'code' | 'audio' | 'video' | 'archive' | 'other';
 export type PricingType = 'free' | 'paid';
 
-/** Only verified school addresses may register: s24427.sun@stu.scie.com.cn */
+/** Only verified school addresses may register: s12345.chen@stu.scie.com.cn */
 export const SCHOOL_EMAIL_DOMAIN = 'stu.scie.com.cn';
 export const SCHOOL_EMAIL_PATTERN = /^s\d{3,10}\.[a-z][a-z'-]*@stu\.scie\.com\.cn$/i;
 
@@ -87,6 +87,36 @@ export interface CommunityPost {
   isOwn?: boolean;
 }
 
+export interface PlazaImage {
+  id: string;
+  url: string;
+}
+
+export interface PlazaPost {
+  id: string;
+  userId: string;
+  author: User;
+  content: string;
+  isAnonymous: boolean;
+  createdAt: string;
+  isOwn?: boolean;
+  images: PlazaImage[];
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+}
+
+export interface PlazaComment {
+  id: string;
+  postId: string;
+  userId: string;
+  author: User;
+  content: string;
+  isAnonymous: boolean;
+  createdAt: string;
+  isOwn?: boolean;
+}
+
 export interface RepoFile {
   id: string;
   repoId: string;
@@ -159,8 +189,6 @@ export interface LeaderboardEntry {
   fileCount: number;
   totalBytes: number;
   totalDownloads: number;
-  totalSales: number;
-  totalRevenue: number;
   averageRating?: number;
 }
 
@@ -285,8 +313,6 @@ export interface HomeStats {
   groups: number;
   users: number;
   downloads: number;
-  totalSales: number;
-  totalRevenue: number;
   freeRepos: number;
 }
 
@@ -295,7 +321,6 @@ export interface HomeData {
   hotRepos: Repository[];
   activeGroups: Group[];
   recentRepos: Repository[];
-  topSellers: LeaderboardEntry[];
   topContributors: LeaderboardEntry[];
   freeRepos: Repository[];
 }

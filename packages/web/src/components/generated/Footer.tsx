@@ -4,17 +4,15 @@ import { FaGithub, FaGraduationCap } from 'react-icons/fa';
 const GITHUB_REPO = 'https://github.com/JasonSun2009CN/SCIEHub';
 
 const PLATFORM_LINKS = [
-  { to: '/free', label: 'Free resources' },
-  { to: '/marketplace', label: 'Marketplace' },
+  { to: '/library', label: 'Resource library' },
   { to: '/community', label: 'The Commons' },
-  { to: '/paid', label: 'Paid resources' },
+  { to: '/plaza', label: 'Plaza' },
   { to: '/groups', label: 'Study groups' },
   { to: '/leaderboard', label: 'Leaderboard' },
 ];
 
 const ACCOUNT_LINKS = [
   { to: '/upload', label: 'Publish a resource' },
-  { to: '/requests', label: 'Purchase requests' },
   { to: '/settings', label: 'Account settings' },
   { to: '/conduct', label: 'Community guidelines' },
 ];
@@ -38,8 +36,8 @@ export function Footer() {
               <span className="text-muted-foreground"> Learn from everyone.</span>
             </p>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              A curated study-resource marketplace for IGCSE, AS/A Level, IB and AP students.
-              Built by students, for students.
+              A free study-resource library and campus community for IGCSE, AS/A Level, IB and AP
+              students. Built by students, for students.
             </p>
           </div>
 
@@ -94,7 +92,10 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-border/70 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
           <span>© {new Date().getFullYear()} SCIEHub. All rights reserved.</span>
-          <span>Share responsibly — respect copyright and academic integrity.</span>
+          <span>
+            Upload only your own work. If your notes were shared without permission, contact the
+            admin for removal.
+          </span>
         </div>
       </div>
     </footer>

@@ -3,7 +3,6 @@ import type { HomeData } from '@sciehub/shared';
 import {
   getLeaderboard,
   getStats,
-  getTopSellers,
   listActiveGroups,
   listFreeRepos,
   listHotRepos,
@@ -21,7 +20,6 @@ export function registerHomeRoutes(app: Hono<AppEnv>): void {
       activeGroups: await listActiveGroups(6, currentUserId),
       recentRepos: await listRecentRepos(6, currentUserId),
       topContributors: await getLeaderboard(5),
-      topSellers: await getTopSellers(5),
       freeRepos: await listFreeRepos(6, currentUserId),
     };
     return c.json(data);
@@ -29,9 +27,7 @@ export function registerHomeRoutes(app: Hono<AppEnv>): void {
 
   app.get('/api/leaderboard', async (c) => {
     const limit = Math.min(Math.max(Number(c.req.query('limit')) || 50, 1), 100);
-    const type = c.req.query('type') === 'sales' ? 'sales' : 'contributors';
-    const items = type === 'sales' ? await getTopSellers(limit) : await getLeaderboard(limit);
-    return c.json({ items, type });
+    return c.json({ items: await getLeaderboard(limit), type: 'contributors' });
   });
 
   app.get('/api/search', async (c) => {

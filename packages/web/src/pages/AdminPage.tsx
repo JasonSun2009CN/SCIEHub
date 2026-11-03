@@ -7,7 +7,6 @@ import { OverviewTab } from '@/components/admin/OverviewTab';
 import { ReportsTab } from '@/components/admin/ReportsTab';
 import { UsersTab } from '@/components/admin/UsersTab';
 import { ReposTab } from '@/components/admin/ReposTab';
-import { OrdersTab } from '@/components/admin/OrdersTab';
 
 export function AdminPage() {
   const { user, loading } = useAuth();
@@ -33,15 +32,11 @@ export function AdminPage() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="repos">Repositories</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <OverviewTab />
-        </TabsContent>
-        <TabsContent value="orders">
-          <OrdersTab />
         </TabsContent>
         <TabsContent value="reports">
           <ReportsTab />

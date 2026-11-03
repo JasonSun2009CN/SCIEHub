@@ -13,6 +13,9 @@ import type {
   LoginLog,
   Order,
   OrderStatus,
+  PlazaComment,
+  PlazaImage,
+  PlazaPost,
   PurchaseRecord,
   PurchaseRequest,
   PurchaseRequestStatus,
@@ -1223,6 +1226,7 @@ function mapCommunityPost(row: any, currentUserId: string | null): CommunityPost
     ? anonymousUser(row.user_id)
     : {
         ...mapUser(row),
+        id: row.user_id,
         createdAt: row.user_created_at,
       };
   return {
@@ -1275,6 +1279,201 @@ export async function createCommunityPost(input: {
 
 export async function deleteCommunityPost(id: string): Promise<void> {
   await run(`DELETE FROM community_posts WHERE id = ?`, id);
+}
+
+// ---------------------------------------------------------------------------
+// Plaza / campus wall
+// ---------------------------------------------------------------------------
+
+const PLAZA_SELECT = `
+SELECT pp.*,
+  u.username AS username, u.nickname AS nickname, u.avatar_url AS avatar_url,
+  u.bio AS bio, u.created_at AS user_created_at,
+  (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
+  (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
+  (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
+  (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
+  (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+  u.wallet_balance AS wallet_balance,
+  u.total_sales AS total_sales,
+  u.total_purchases AS total_purchases,
+  (SELECT COUNT(*) FROM plaza_likes pl WHERE pl.post_id = pp.id) AS like_count,
+  (SELECT COUNT(*) FROM plaza_comments pc WHERE pc.post_id = pp.id) AS comment_count,
+  EXISTS(SELECT 1 FROM plaza_likes pl2 WHERE pl2.post_id = pp.id AND pl2.user_id = ?) AS liked_by_me
+FROM plaza_posts pp
+JOIN users u ON u.id = pp.user_id
+`;
+
+async function plazaImagesForPost(postId: string): Promise<PlazaImage[]> {
+  const rows = await all(
+    `SELECT id, image_key FROM plaza_images WHERE post_id = ? ORDER BY sort_order ASC, created_at ASC`,
+    postId,
+  ) as any[];
+  return rows.map((row) => ({ id: row.id, url: `/uploads/${row.image_key}` }));
+}
+
+async function mapPlazaPost(row: any, currentUserId: string | null): Promise<PlazaPost> {
+  const isAnonymous = Boolean(row.is_anonymous);
+  const author = isAnonymous
+    ? anonymousUser(row.user_id)
+    : { ...mapUser(row), id: row.user_id, createdAt: row.user_created_at };
+  return {
+    id: row.id,
+    userId: row.user_id,
+    author,
+    content: row.content ?? '',
+    isAnonymous,
+    createdAt: row.created_at,
+    isOwn: currentUserId === row.user_id,
+    images: await plazaImagesForPost(row.id),
+    likeCount: Number(row.like_count ?? 0),
+    commentCount: Number(row.comment_count ?? 0),
+    likedByMe: Boolean(row.liked_by_me),
+  };
+}
+
+export async function listPlazaPosts(
+  limit = 20,
+  offset = 0,
+  currentUserId: string | null = null,
+): Promise<PlazaPost[]> {
+  const rows = await all(
+    `${PLAZA_SELECT} ORDER BY pp.created_at DESC LIMIT ? OFFSET ?`,
+    currentUserId ?? '',
+    Math.min(Math.max(limit, 1), 50),
+    Math.max(offset, 0),
+  ) as any[];
+  const posts: PlazaPost[] = [];
+  for (const row of rows) posts.push(await mapPlazaPost(row, currentUserId));
+  return posts;
+}
+
+export async function getPlazaPostById(
+  id: string,
+  currentUserId: string | null = null,
+): Promise<PlazaPost | null> {
+  const row = await one(`${PLAZA_SELECT} WHERE pp.id = ?`, currentUserId ?? '', id) as any;
+  return row ? mapPlazaPost(row, currentUserId) : null;
+}
+
+export async function createPlazaPost(input: {
+  userId: string;
+  content: string;
+  isAnonymous: boolean;
+  imageKeys: string[];
+}): Promise<PlazaPost> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const db = getDb();
+  const statements: D1PreparedStatement[] = [
+    db
+      .prepare(
+        `INSERT INTO plaza_posts (id, user_id, content, is_anonymous, created_at) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(id, input.userId, input.content, input.isAnonymous ? 1 : 0, now),
+  ];
+  input.imageKeys.forEach((key, index) => {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO plaza_images (id, post_id, image_key, sort_order, created_at) VALUES (?, ?, ?, ?, ?)`,
+        )
+        .bind(crypto.randomUUID(), id, key, index, now),
+    );
+  });
+  await batch(statements);
+  return (await getPlazaPostById(id, input.userId))!;
+}
+
+export async function togglePlazaLike(
+  postId: string,
+  userId: string,
+): Promise<{ liked: boolean; count: number }> {
+  const existing = await one(`SELECT 1 FROM plaza_likes WHERE post_id = ? AND user_id = ?`, postId, userId);
+  if (existing) {
+    await run(`DELETE FROM plaza_likes WHERE post_id = ? AND user_id = ?`, postId, userId);
+  } else {
+    await run(
+      `INSERT INTO plaza_likes (post_id, user_id, created_at) VALUES (?, ?, ?)`,
+      postId,
+      userId,
+      new Date().toISOString(),
+    );
+  }
+  const row = await one(`SELECT COUNT(*) AS c FROM plaza_likes WHERE post_id = ?`, postId) as any;
+  return { liked: !existing, count: Number(row.c) };
+}
+
+export async function listPlazaComments(
+  postId: string,
+  currentUserId: string | null = null,
+): Promise<PlazaComment[]> {
+  const rows = await all(
+    `SELECT pc.*, u.username AS username, u.nickname AS nickname, u.avatar_url AS avatar_url,
+            u.bio AS bio, u.created_at AS user_created_at,
+            (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
+            (SELECT COUNT(*) FROM files f JOIN repos r2 ON r2.id = f.repo_id WHERE r2.owner_id = u.id) AS file_count,
+            (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
+            (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r3 ON r3.id = f2.repo_id WHERE r3.owner_id = u.id) AS total_downloads,
+            (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r4 ON r4.id = f3.repo_id WHERE r4.owner_id = u.id) AS total_bytes,
+            u.wallet_balance AS wallet_balance, u.total_sales AS total_sales, u.total_purchases AS total_purchases
+     FROM plaza_comments pc
+     JOIN users u ON u.id = pc.user_id
+     WHERE pc.post_id = ?
+     ORDER BY pc.created_at ASC`,
+    postId,
+  ) as any[];
+  return rows.map((row) => {
+    const isAnonymous = Boolean(row.is_anonymous);
+    const author = isAnonymous
+      ? anonymousUser(row.user_id)
+      : { ...mapUser(row), id: row.user_id, createdAt: row.user_created_at };
+    return {
+      id: row.id,
+      postId: row.post_id,
+      userId: row.user_id,
+      author,
+      content: row.content,
+      isAnonymous,
+      createdAt: row.created_at,
+      isOwn: currentUserId === row.user_id,
+    };
+  });
+}
+
+export async function createPlazaComment(input: {
+  postId: string;
+  userId: string;
+  content: string;
+  isAnonymous: boolean;
+}): Promise<PlazaComment> {
+  const id = crypto.randomUUID();
+  await run(
+    `INSERT INTO plaza_comments (id, post_id, user_id, content, is_anonymous, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    id,
+    input.postId,
+    input.userId,
+    input.content,
+    input.isAnonymous ? 1 : 0,
+    new Date().toISOString(),
+  );
+  const comments = await listPlazaComments(input.postId, input.userId);
+  return comments.find((comment) => comment.id === id)!;
+}
+
+export async function deletePlazaComment(id: string): Promise<void> {
+  await run(`DELETE FROM plaza_comments WHERE id = ?`, id);
+}
+
+export async function getPlazaCommentById(id: string): Promise<PlazaComment | null> {
+  const row = await one(`SELECT * FROM plaza_comments WHERE id = ?`, id);
+  return row ? (await listPlazaComments(row.post_id)).find((comment) => comment.id === id) ?? null : null;
+}
+
+export async function deletePlazaPost(id: string): Promise<void> {
+  const images = await all(`SELECT image_key FROM plaza_images WHERE post_id = ?`, id) as any[];
+  for (const image of images) await deleteUpload(`/uploads/${image.image_key}`);
+  await run(`DELETE FROM plaza_posts WHERE id = ?`, id);
 }
 
 // ---------------------------------------------------------------------------
@@ -1722,36 +1921,6 @@ export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
       fileCount: user.fileCount,
       totalBytes: user.totalBytes,
       totalDownloads: user.totalDownloads,
-      totalSales: user.totalSales,
-      totalRevenue: 0, // per user revenue not tracked in users table yet; skip
-    };
-  });
-}
-
-export async function getTopSellers(limit = 20): Promise<LeaderboardEntry[]> {
-  const rows = await all(`SELECT u.*,
-         (SELECT COUNT(*) FROM repos r WHERE r.owner_id = u.id) AS repo_count,
-         (SELECT COUNT(*) FROM files f JOIN repos r ON r.id = f.repo_id WHERE r.owner_id = u.id) AS file_count,
-         (SELECT COUNT(*) FROM group_members gm WHERE gm.user_id = u.id) AS group_count,
-         (SELECT COALESCE(SUM(f2.download_count), 0) FROM files f2 JOIN repos r2 ON r2.id = f2.repo_id WHERE r2.owner_id = u.id) AS total_downloads,
-         (SELECT COALESCE(SUM(f3.file_bytes), 0) FROM files f3 JOIN repos r3 ON r3.id = f3.repo_id WHERE r3.owner_id = u.id) AS total_bytes,
-         (SELECT COALESCE(SUM(r4.total_revenue), 0) FROM repos r4 WHERE r4.owner_id = u.id) AS seller_revenue,
-         (SELECT AVG(rv.rating) FROM reviews rv JOIN repos r5 ON r5.id = rv.repo_id WHERE r5.owner_id = u.id) AS seller_rating
-       FROM users u
-       WHERE u.total_sales > 0
-       ORDER BY u.total_sales DESC
-       LIMIT ?`, limit) as any[];
-  return rows.map((row) => {
-    const user = mapUser(row);
-    return {
-      user,
-      repoCount: user.repoCount,
-      fileCount: user.fileCount,
-      totalBytes: user.totalBytes,
-      totalDownloads: user.totalDownloads,
-      totalSales: user.totalSales,
-      totalRevenue: Number(row.seller_revenue ?? 0),
-      averageRating: Number(row.seller_rating ?? 0),
     };
   });
 }
@@ -1764,8 +1933,6 @@ export async function getStats(): Promise<HomeData['stats']> {
     groups: await count('groups'),
     users: await count('users'),
     downloads: (await one(`SELECT COALESCE(SUM(download_count), 0) AS c FROM files`) as any).c,
-    totalSales: (await one(`SELECT COALESCE(SUM(total_sales), 0) AS c FROM repos`) as any).c,
-    totalRevenue: (await one(`SELECT COALESCE(SUM(total_revenue), 0) AS c FROM repos`) as any).c,
     freeRepos: (await one(`SELECT COUNT(*) AS c FROM repos WHERE pricing_type = 'free'`) as any).c,
   };
 }
@@ -1917,16 +2084,12 @@ export async function getAdminOverview(): Promise<{
   stats: HomeData['stats'];
   comments: number;
   openReports: number;
-  orders: number;
-  revenue: number;
 }> {
   const stats = await getStats();
   return {
     stats,
     comments: (await one(`SELECT COUNT(*) AS c FROM comments`) as any).c,
     openReports: await countOpenReports(),
-    orders: (await one(`SELECT COUNT(*) AS c FROM orders WHERE status = 'paid'`) as any).c,
-    revenue: stats.totalRevenue,
   };
 }
 
@@ -1992,6 +2155,11 @@ export async function deleteUserWithFiles(userId: string): Promise<void> {
     if (page.items.length < 100) break;
     offset += 100;
   }
+  const plazaImages = await all(
+    `SELECT pi.image_key FROM plaza_images pi JOIN plaza_posts pp ON pp.id = pi.post_id WHERE pp.user_id = ?`,
+    userId,
+  ) as any[];
+  for (const image of plazaImages) await deleteUpload(`/uploads/${image.image_key}`);
   await deleteUser(userId);
 }
 

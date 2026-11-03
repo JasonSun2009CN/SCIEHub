@@ -4,7 +4,6 @@ export interface Env {
   ASSETS: Fetcher;
   JWT_SECRET?: string;
   ADMIN_EMAILS?: string;
-  SCIEHUB_ALLOW_SELF_TOPUP?: string;
   SCIEHUB_MAX_FILE_MB?: string;
   SCIEHUB_MAX_FILES?: string;
 }
@@ -14,7 +13,6 @@ export interface RuntimeConfig {
   adminEmails: string[];
   maxFileBytes: number;
   maxFilesPerRequest: number;
-  allowSelfTopup: boolean;
 }
 
 const DEFAULT_JWT_SECRET = 'sciehub-dev-secret-change-me';
@@ -26,7 +24,6 @@ let config: RuntimeConfig = {
   adminEmails: [],
   maxFileBytes: 50 * 1024 * 1024,
   maxFilesPerRequest: 8,
-  allowSelfTopup: false,
 };
 
 /**
@@ -46,7 +43,6 @@ export function initRuntime(env: Env): void {
       .filter(Boolean),
     maxFileBytes: (Number.isFinite(maxMb) && maxMb > 0 ? maxMb : 50) * 1024 * 1024,
     maxFilesPerRequest: Number.isFinite(maxFiles) && maxFiles > 0 ? Math.floor(maxFiles) : 8,
-    allowSelfTopup: env.SCIEHUB_ALLOW_SELF_TOPUP === '1',
   };
 }
 

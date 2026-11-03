@@ -13,9 +13,7 @@ import {
   FaFolder,
   FaHeart,
   FaLink,
-  FaLock,
   FaPaperclip,
-  FaShoppingCart,
   FaSpinner,
   FaUserSecret,
   FaStar,
@@ -23,18 +21,12 @@ import {
 } from 'react-icons/fa';
 import {
   CATEGORIES,
-  CURRENCIES,
   LEVELS,
-  MAX_FILE_PRICE,
   RESOURCE_TYPES,
   formatBytes,
-  formatPrice,
   type Comment,
-  type Currency,
   type EducationLevel,
   type Group,
-  type PricingType,
-  type PurchaseRequest,
   type ResourceType,
   type RepoFile,
   type Repository,
@@ -91,14 +83,10 @@ export function RepoDetailPage() {
   const [editCategory, setEditCategory] = useState('');
   const [editResourceType, setEditResourceType] = useState<ResourceType>('notes');
   const [editTags, setEditTags] = useState<string[]>([]);
-  const [editPricingType, setEditPricingType] = useState<PricingType>('free');
-  const [editPrice, setEditPrice] = useState('');
-  const [editCurrency, setEditCurrency] = useState<Currency>('CNY');
   const [editIsAnonymous, setEditIsAnonymous] = useState(false);
   const [editPreviewImageUrl, setEditPreviewImageUrl] = useState('');
-  const [requestOpen, setRequestOpen] = useState(false);
-  const [requestMessage, setRequestMessage] = useState('');
   const [fileToDelete, setFileToDelete] = useState<RepoFile | null>(null);
+  const [previewFile, setPreviewFile] = useState<RepoFile | null>(null);
   // Review form
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState('');
@@ -121,12 +109,6 @@ export function RepoDetailPage() {
     queryKey: ['myGroups', user?.username],
     queryFn: () => api<{ items: Group[] }>(`/users/${user!.username}/groups`),
     enabled: Boolean(user),
-  });
-
-  const { data: requestData } = useQuery({
-    queryKey: ['purchase-request', id, user?.id],
-    queryFn: () => api<{ request: PurchaseRequest | null }>(`/repos/${id}/purchase-request`),
-    enabled: Boolean(id && user && data?.repo.pricingType === 'paid' && !data?.repo.isOwner),
   });
 
   const invalidateRepo = () => {
@@ -192,10 +174,7 @@ export function RepoDetailPage() {
           categoryId: editCategory,
           resourceType: editResourceType,
           tags: editTags.join(','),
-          pricingType: editPricingType,
-          price: editPricingType === 'paid' ? Number(editPrice) : 0,
-          currency: editCurrency,
-          isAnonymous: editPricingType === 'free' ? editIsAnonymous : false,
+          isAnonymous: editIsAnonymous,
           previewImageUrl: editPreviewImageUrl.trim() || null,
         },
       }),
@@ -207,22 +186,6 @@ export function RepoDetailPage() {
       toast('Repository updated', 'success');
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not update repository', 'error'),
-  });
-
-  const requestMutation = useMutation({
-    mutationFn: () =>
-      api<{ request: PurchaseRequest }>(`/repos/${id}/purchase-request`, {
-        method: 'POST',
-        json: { message: requestMessage.trim() },
-      }),
-    onSuccess: () => {
-      setRequestOpen(false);
-      setRequestMessage('');
-      queryClient.invalidateQueries({ queryKey: ['purchase-request', id, user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['requests'] });
-      toast('Request sent — the seller can now see your email.', 'success');
-    },
-    onError: (err) => toast(err instanceof Error ? err.message : 'Could not send request', 'error'),
   });
 
   const fileDeleteMutation = useMutation({
@@ -323,10 +286,7 @@ export function RepoDetailPage() {
 
   const { repo, files, related, reviews = [], purchaseState } = data;
   const isOwner = repo.isOwner ?? purchaseState?.isOwner ?? false;
-  const isPurchased = purchaseState?.isPurchased ?? repo.isPurchased ?? false;
   const canReview = purchaseState?.canReview ?? false;
-  const needsPurchase = repo.pricingType === 'paid' && !isOwner && !isPurchased;
-  const pendingRequest = requestData?.request ?? null;
 
   const openEdit = () => {
     setEditName(repo.name);
@@ -335,9 +295,6 @@ export function RepoDetailPage() {
     setEditCategory(repo.categoryId);
     setEditResourceType(repo.resourceType);
     setEditTags(repo.tags);
-    setEditPricingType(repo.pricingType);
-    setEditPrice(repo.pricingType === 'paid' ? String(repo.price) : '');
-    setEditCurrency(repo.currency);
     setEditIsAnonymous(repo.isAnonymous);
     setEditPreviewImageUrl(repo.previewImageUrl ?? '');
     setEditOpen(true);
@@ -346,8 +303,8 @@ export function RepoDetailPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <PageMeta title={repo.name} description={repo.description} />
-      <Link to="/marketplace" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <FaArrowLeft className="h-3.5 w-3.5" /> Back to marketplace
+      <Link to="/library" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <FaArrowLeft className="h-3.5 w-3.5" /> Back to library
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-12">
@@ -364,13 +321,7 @@ export function RepoDetailPage() {
                   <Badge>{repo.levelName}</Badge>
                   <Badge variant="secondary">{repo.categoryName}</Badge>
                   <Badge variant="outline">{repo.resourceTypeName}</Badge>
-                  {repo.pricingType === 'free' ? (
-                    <Badge variant="success">Free</Badge>
-                  ) : (
-                    <Badge variant="outline" className="tabular-nums">
-                      {formatPrice(repo.price, repo.currency)}
-                    </Badge>
-                  )}
+                  <Badge variant="success">Free download</Badge>
                   {repo.tags.slice(0, 3).map((t) => (
                     <Badge key={t} variant="secondary">#{t}</Badge>
                   ))}
@@ -511,33 +462,6 @@ export function RepoDetailPage() {
               <FaPaperclip className="h-4 w-4 text-accent" /> Files ({formatNumber(repo.fileCount)})
             </h2>
 
-            {needsPurchase && (
-              <div className="mb-4 flex items-start gap-3 rounded-md border border-accent/25 bg-accent-subtle px-4 py-3">
-                <FaLock className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-                <div className="text-sm">
-                  <p className="font-medium text-foreground">This is a paid resource</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {files.length > 0
-                      ? `You can preview ${files.length} file${files.length === 1 ? '' : 's'}. Request contact with the seller to arrange the full ${formatNumber(repo.fileCount)}-file pack.`
-                      : `All ${formatNumber(repo.fileCount)} files are locked. Request contact with the seller to arrange access.`}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  className="ml-auto shrink-0"
-                  onClick={() => setRequestOpen(true)}
-                  disabled={Boolean(pendingRequest)}
-                >
-                  <FaShoppingCart className="h-3.5 w-3.5" />
-                  {pendingRequest
-                    ? pendingRequest.status === 'completed'
-                      ? 'Exchange completed'
-                      : 'Request sent'
-                    : 'Request purchase'}
-                </Button>
-              </div>
-            )}
-
             {files.length === 0 ? (
               <div className="rounded-md border border-dashed border-border bg-surface-2 py-12 text-center text-sm text-muted-foreground">
                 No files yet.
@@ -563,23 +487,24 @@ export function RepoDetailPage() {
                     {file.fileType === 'image' && (
                       <img src={file.filePath} alt={file.title} className="h-10 w-14 shrink-0 rounded border border-border object-cover" loading="lazy" />
                     )}
-                    {needsPurchase && !file.isPreview ? (
-                      <span
-                        className="shrink-0 rounded-md border border-border p-2 text-muted-foreground"
-                        aria-label="Locked file"
-                        title="Buy this resource to unlock the download"
+                    {(file.fileType === 'pdf' || file.fileType === 'image') && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewFile(file)}
+                        className="shrink-0 cursor-pointer rounded-md border border-border p-2 text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+                        aria-label={`Preview ${file.title}`}
+                        title="Preview in browser"
                       >
-                        <FaLock className="h-4 w-4" />
-                      </span>
-                    ) : (
-                      <a
-                        href={`/api/files/${file.id}/download`}
-                        className="shrink-0 rounded-md border border-border p-2 text-muted-foreground transition-colors hover:border-accent hover:text-accent"
-                        aria-label={`Download ${file.title}`}
-                      >
-                        <FaDownload className="h-4 w-4" />
-                      </a>
+                        <FaEye className="h-4 w-4" />
+                      </button>
                     )}
+                    <a
+                      href={`/api/files/${file.id}/download`}
+                      className="shrink-0 rounded-md border border-border p-2 text-muted-foreground transition-colors hover:border-accent hover:text-accent"
+                      aria-label={`Download ${file.title}`}
+                    >
+                      <FaDownload className="h-4 w-4" />
+                    </a>
                     {isOwner && (
                       <button
                         type="button"
@@ -595,6 +520,12 @@ export function RepoDetailPage() {
                 ))}
               </ul>
             )}
+
+            <p className="mt-4 rounded-xl border border-warning/25 bg-warning-subtle px-3.5 py-2.5 text-xs leading-5 text-muted-foreground">
+              <span className="font-semibold text-foreground">Original work only.</span> If your own
+              notes were uploaded here without your permission, contact the administrator to have
+              them removed.
+            </p>
           </div>
 
           {/* Comments */}
@@ -736,7 +667,7 @@ export function RepoDetailPage() {
                 <Textarea
                   value={reviewContent}
                   onChange={(e) => setReviewContent(e.target.value)}
-                  placeholder="What did you think? Was it accurate, well-organised, worth the price?"
+                  placeholder="What did you think? Was it accurate, clear and useful?"
                   rows={3}
                   className="mt-2 bg-surface"
                 />
@@ -751,10 +682,6 @@ export function RepoDetailPage() {
                   </Button>
                 </div>
               </form>
-            ) : needsPurchase ? (
-              <p className="mb-6 rounded-md bg-surface-2 p-3 text-sm text-muted-foreground">
-                Reviews are available after the seller marks your purchase request as completed.
-              </p>
             ) : !user ? (
               <p className="mb-6 rounded-md bg-surface-2 p-3 text-sm text-muted-foreground">
                 <Link to="/auth" state={{ from: window.location.pathname }} className="text-accent hover:underline">
@@ -824,10 +751,6 @@ export function RepoDetailPage() {
                         {review.content && (
                           <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{review.content}</p>
                         )}
-                        <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <FaCheck className="h-3 w-3 text-success" aria-hidden />
-                          Verified purchase
-                        </span>
                       </div>
                     </li>
                   );
@@ -839,104 +762,19 @@ export function RepoDetailPage() {
 
         {/* Sidebar */}
         <aside className="space-y-6 lg:col-span-4">
-          {/* Purchase / pricing */}
+          {/* Free download */}
           <div
-            className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5"
+            className="animate-fade-in-up rounded-2xl border border-success/25 bg-success-subtle p-5"
             style={{ animationDelay: '200ms' }}
           >
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                {repo.pricingType === 'free' ? (
-                  <>
-                    <FaDownload className="h-4 w-4 text-success" aria-hidden /> Free download
-                  </>
-                ) : (
-                  <>
-                    <FaLock className="h-4 w-4 text-accent" aria-hidden /> Paid resource
-                  </>
-                )}
-              </h3>
-              {repo.pricingType === 'paid' && (
-                <Badge variant="outline">{formatNumber(repo.totalSales)} sold</Badge>
-              )}
-            </div>
-
-            {repo.pricingType === 'free' ? (
-              <>
-                <p className="mt-2 text-3xl font-extrabold text-success tabular-nums">Free</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  No payment needed — download any of the {formatNumber(repo.fileCount)} files directly.
-                </p>
-              </>
-            ) : isOwner ? (
-              <>
-                <p className="mt-2 text-3xl font-extrabold text-warning tabular-nums">
-                  {formatPrice(repo.price, repo.currency)}
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">You own this listing.</p>
-                <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-xs text-muted-foreground">
-                  <p>
-                    Buyers send a request with their email. You arrange payment and delivery on another
-                    platform — SCIEHub does not process the transaction.
-                  </p>
-                </div>
-                <Button className="mt-4 w-full" variant="secondary" asChild>
-                  <Link to="/requests">
-                    <FaShoppingCart className="h-4 w-4" /> View purchase requests
-                  </Link>
-                </Button>
-              </>
-            ) : isPurchased ? (
-              <>
-                <p className="mt-2 flex items-center gap-2 text-lg font-bold text-success">
-                  <FaCheck className="h-5 w-5" aria-hidden /> Purchased
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  All {formatNumber(repo.fileCount)} files are unlocked. Download them below.
-                </p>
-              </>
-            ) : pendingRequest ? (
-              <>
-                <p className="mt-2 flex items-center gap-2 text-lg font-bold text-success">
-                  <FaCheck className="h-5 w-5" aria-hidden />
-                  {pendingRequest.status === 'completed' ? 'Exchange completed' : 'Request sent'}
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {pendingRequest.status === 'completed'
-                    ? 'The seller marked this exchange as completed. You can now leave a review.'
-                    : 'The seller can see your account email and will contact you to arrange payment and delivery outside SCIEHub.'}
-                </p>
-                <Button className="mt-4 w-full" variant="secondary" asChild>
-                  <Link to="/requests">Track this request</Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="mt-2 text-3xl font-extrabold text-warning tabular-nums">
-                  {formatPrice(repo.price, repo.currency)}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  This is an introduction, not an on-site checkout. Send a request and the seller
-                  receives your email. Payment and delivery happen on another platform.
-                </p>
-                <Button
-                  className="mt-4 w-full"
-                  size="lg"
-                  onClick={() => setRequestOpen(true)}
-                  disabled={!user}
-                >
-                  <FaShoppingCart className="h-4 w-4" /> Request purchase
-                </Button>
-                {!user && (
-                  <p className="mt-2 text-center text-xs text-muted-foreground">
-                    <Link to="/auth" state={{ from: window.location.pathname }} className="text-accent hover:underline">
-                      Sign in
-                    </Link>{' '}
-                    to contact the seller.
-                  </p>
-                )}
-              </>
-            )}
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+              <FaDownload className="h-4 w-4 text-success" aria-hidden /> Free download
+            </h3>
+            <p className="mt-2 text-3xl font-extrabold text-success tabular-nums">Free</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              No payment, no account required — download any of the {formatNumber(repo.fileCount)}{' '}
+              files directly.
+            </p>
           </div>
 
           <div className="animate-fade-in-up rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-5" style={{ animationDelay: '240ms' }}>
@@ -1046,7 +884,7 @@ export function RepoDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit repository</DialogTitle>
-            <DialogDescription>Update the name, level, subject, resource type, pricing or tags.</DialogDescription>
+            <DialogDescription>Update the name, level, subject, resource type, visibility or tags.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -1119,95 +957,38 @@ export function RepoDetailPage() {
               </div>
             </div>
 
-            {/* Pricing */}
             <Separator />
-            <div className="space-y-2">
-              <Label>Pricing</Label>
-              <Select
-                value={editPricingType}
-                onValueChange={(v) => {
-                  setEditPricingType(v as PricingType);
-                  if (v === 'paid') setEditIsAnonymous(false);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Free or paid" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">Free download</SelectItem>
-                  <SelectItem value="paid">Paid resource</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Free resources are downloadable by everyone. Paid resources collect contact requests;
-                payment happens off-platform.
-              </p>
-            </div>
-            {editPricingType === 'free' && (
-              <button
-                type="button"
-                onClick={() => setEditIsAnonymous((value) => !value)}
+            <button
+              type="button"
+              onClick={() => setEditIsAnonymous((value) => !value)}
+              className={cn(
+                'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-left text-sm transition-colors',
+                editIsAnonymous
+                  ? 'border-accent/45 bg-accent-subtle text-foreground'
+                  : 'border-border/70 bg-surface text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <FaUserSecret className="h-4 w-4 shrink-0 text-accent" />
+              <span className="flex-1">
+                <span className="font-semibold">Publish anonymously</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Hide your username on this listing.
+                </span>
+              </span>
+              <span
                 className={cn(
-                  'flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-left text-sm transition-colors',
-                  editIsAnonymous
-                    ? 'border-accent/45 bg-accent-subtle text-foreground'
-                    : 'border-border/70 bg-surface text-muted-foreground hover:text-foreground',
+                  'flex h-5 w-9 items-center rounded-full p-0.5 transition-colors',
+                  editIsAnonymous ? 'bg-accent' : 'bg-border',
                 )}
               >
-                <FaUserSecret className="h-4 w-4 shrink-0 text-accent" />
-                <span className="flex-1">
-                  <span className="font-semibold">Publish anonymously</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Hide your username on this free listing.
-                  </span>
-                </span>
                 <span
                   className={cn(
-                    'flex h-5 w-9 items-center rounded-full p-0.5 transition-colors',
-                    editIsAnonymous ? 'bg-accent' : 'bg-border',
+                    'h-4 w-4 rounded-full bg-background transition-transform',
+                    editIsAnonymous && 'translate-x-4',
                   )}
-                >
-                  <span
-                    className={cn(
-                      'h-4 w-4 rounded-full bg-background transition-transform',
-                      editIsAnonymous && 'translate-x-4',
-                    )}
-                  />
-                </span>
-              </button>
-            )}
-            {editPricingType === 'paid' && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-repo-price">Price *</Label>
-                  <Input
-                    id="edit-repo-price"
-                    type="number"
-                    min="0.01"
-                    max={MAX_FILE_PRICE}
-                    step="0.01"
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
-                    placeholder="9.9"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={editCurrency} onValueChange={(v) => setEditCurrency(v as Currency)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CURRENCIES.map((c) => (
-                        <SelectItem key={c.code} value={c.code}>
-                          {c.symbol} {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
+                />
+              </span>
+            </button>
             <div className="space-y-2">
               <Label htmlFor="edit-repo-preview">Preview image URL</Label>
               <Input
@@ -1222,13 +1003,7 @@ export function RepoDetailPage() {
             <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button
               onClick={() => updateMutation.mutate()}
-              disabled={
-                !editName.trim() ||
-                !editCategory ||
-                (editPricingType === 'paid' &&
-                  (!Number.isFinite(Number(editPrice)) || Number(editPrice) <= 0 || Number(editPrice) > MAX_FILE_PRICE)) ||
-                updateMutation.isPending
-              }
+              disabled={!editName.trim() || !editCategory || updateMutation.isPending}
             >
               {updateMutation.isPending && <FaSpinner className="h-4 w-4 animate-spin" />}
               Save changes
@@ -1237,49 +1012,41 @@ export function RepoDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Request purchase</DialogTitle>
+      <Dialog open={Boolean(previewFile)} onOpenChange={(open) => !open && setPreviewFile(null)}>
+        <DialogContent className="flex h-[88vh] max-h-[88vh] max-w-5xl flex-col gap-3 p-0">
+          <DialogHeader className="shrink-0 border-b border-border/70 px-5 py-4 pr-12">
+            <DialogTitle className="truncate text-base">{previewFile?.title}</DialogTitle>
             <DialogDescription>
-              The seller receives your account email and can contact you. SCIEHub does not process
-              payment — you arrange it directly on another platform.
+              Previewed directly from SCIEHub. Use the download button for the original file.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-xl border border-border/70 bg-surface-2/50 p-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Resource</span>
-                <span className="text-right font-medium">{repo.name}</span>
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Listed price</span>
-                <span className="font-semibold tabular-nums text-warning">
-                  {formatPrice(repo.price, repo.currency)}
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="request-message">Message to seller (optional)</Label>
-              <Textarea
-                id="request-message"
-                value={requestMessage}
-                onChange={(e) => setRequestMessage(e.target.value)}
-                placeholder="Tell the seller what you need, or how you'd like to be contacted."
-                rows={3}
-                maxLength={1000}
+          <div className="min-h-0 flex-1 overflow-hidden bg-surface-2">
+            {previewFile?.fileType === 'pdf' ? (
+              <iframe
+                key={previewFile.id}
+                src={`/api/files/${previewFile.id}/preview#toolbar=1&navpanes=0`}
+                title={previewFile.title}
+                className="h-full w-full border-0"
               />
-            </div>
+            ) : previewFile?.fileType === 'image' ? (
+              <div className="flex h-full items-center justify-center overflow-auto p-4">
+                <img
+                  src={`/api/files/${previewFile.id}/preview`}
+                  alt={previewFile.title}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : null}
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setRequestOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => requestMutation.mutate()} disabled={requestMutation.isPending}>
-              {requestMutation.isPending && <FaSpinner className="h-4 w-4 animate-spin" />}
-              Send request
-            </Button>
-          </DialogFooter>
+          {previewFile && (
+            <DialogFooter className="shrink-0 border-t border-border/70 px-5 py-3">
+              <Button variant="outline" size="sm" asChild>
+                <a href={`/api/files/${previewFile.id}/download`}>
+                  <FaDownload className="h-3.5 w-3.5" /> Download
+                </a>
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 

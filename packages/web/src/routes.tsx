@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import { Layout } from './layout';
 import { HomePage } from './pages/HomePage';
 import { FeedPage } from './pages/FeedPage';
@@ -14,7 +14,7 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 import { ConductPage } from './pages/ConductPage';
 import { ContributingPage } from './pages/ContributingPage';
 import { CommunityPage } from './pages/CommunityPage';
-import { RequestsPage } from './pages/RequestsPage';
+import { PlazaPage } from './pages/PlazaPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -22,14 +22,16 @@ export function AppRoutes() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
-        <Route path="/feed" element={<FeedPage />} />
-        <Route path="/marketplace" element={<FeedPage />} />
-        <Route path="/free" element={<FeedPage zone="free" />} />
-        <Route path="/paid" element={<FeedPage zone="paid" />} />
+        <Route path="/library" element={<FeedPage />} />
+        <Route path="/feed" element={<Navigate to="/library" replace />} />
+        <Route path="/marketplace" element={<Navigate to="/library" replace />} />
+        <Route path="/free" element={<Navigate to="/library" replace />} />
+        <Route path="/paid" element={<Navigate to="/library" replace />} />
         <Route path="/repos/:id" element={<RepoDetailPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/community" element={<CommunityPage />} />
-        <Route path="/requests" element={<RequestsPage />} />
+        <Route path="/plaza" element={<PlazaPage />} />
+        <Route path="/requests" element={<Navigate to="/library" replace />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/groups/:id" element={<GroupDetailPage />} />
         <Route path="/users/:username" element={<UserProfilePage />} />

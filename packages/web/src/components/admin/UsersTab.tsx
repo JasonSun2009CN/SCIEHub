@@ -5,11 +5,9 @@ import {
   FaBan,
   FaCheck,
   FaCloudUploadAlt,
-  FaCoins,
   FaComments,
   FaSearch,
   FaShieldAlt,
-  FaShoppingCart,
   FaTrash,
   FaUserShield,
 } from 'react-icons/fa';
@@ -31,16 +29,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/context/AuthContext';
-import { cn, formatDate, formatNumber } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 const PAGE = 20;
 
-type PermissionKey = 'canBuy' | 'canPublishFree' | 'canPublishPaid' | 'canChat';
+type PermissionKey = 'canPublishFree' | 'canChat';
 
 const PERMISSIONS: { key: PermissionKey; label: string; Icon: typeof FaComments }[] = [
-  { key: 'canBuy', label: 'Request paid resources', Icon: FaShoppingCart },
   { key: 'canPublishFree', label: 'Publish free content', Icon: FaCloudUploadAlt },
-  { key: 'canPublishPaid', label: 'Publish paid content', Icon: FaCoins },
   { key: 'canChat', label: 'Post in community', Icon: FaComments },
 ];
 
@@ -81,9 +77,7 @@ export function UsersTab() {
       patch: {
         isAdmin?: boolean;
         isSuspended?: boolean;
-        canBuy?: boolean;
         canPublishFree?: boolean;
-        canPublishPaid?: boolean;
         canChat?: boolean;
       };
     }) => api(`/admin/users/${id}`, { method: 'PATCH', json: patch }),
@@ -114,27 +108,6 @@ export function UsersTab() {
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Delete failed', 'error'),
   });
-
-  const topupMutation = useMutation({
-    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
-      api(`/admin/users/${id}/topup`, { method: 'POST', json: { amount, currency: 'CNY' } }),
-    onSuccess: () => {
-      refresh();
-      toast('Wallet topped up', 'success');
-    },
-    onError: (err) => toast(err instanceof Error ? err.message : 'Top-up failed', 'error'),
-  });
-
-  const onTopup = (u: User) => {
-    const raw = window.prompt(`Enter top-up amount (¥) for @${u.username}:`, '10');
-    if (raw === null) return;
-    const amount = Number(raw);
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
-      toast('Amount must be a positive number ≤ 1,000,000', 'error');
-      return;
-    }
-    topupMutation.mutate({ id: u.id, amount });
-  };
 
   const total = data?.total ?? 0;
   const hasMore = items.length < total;
@@ -177,20 +150,14 @@ export function UsersTab() {
                   </Link>
                   <span className="text-xs text-muted-foreground"> @{u.username} · {u.email}</span>
                   <div className="mt-0.5 text-xs text-muted-foreground">
-                    {u.repoCount} repos · {u.fileCount} files · {formatBytes(u.totalBytes)} · joined {formatDate(u.createdAt)} ·{' '}
-                    wallet{' '}
-                    <span className="font-semibold text-accent tabular-nums">
-                      ¥{formatNumber(u.walletBalance)}
-                    </span>
+                    {u.repoCount} repos · {u.fileCount} files · {formatBytes(u.totalBytes)} · joined {formatDate(u.createdAt)}
                   </div>
                 </div>
                 {u.isAdmin && <Badge variant="warning">Admin</Badge>}
                 {u.isSuspended && <Badge variant="error">Banned</Badge>}
                 {!u.isSuspended && (
                   <div className="flex flex-wrap gap-1">
-                    {u.canBuy === false && <Badge variant="error">Buy off</Badge>}
-                    {u.canPublishFree === false && <Badge variant="error">Free off</Badge>}
-                    {u.canPublishPaid === false && <Badge variant="error">Paid off</Badge>}
+                    {u.canPublishFree === false && <Badge variant="error">Publish off</Badge>}
                     {u.canChat === false && <Badge variant="error">Chat off</Badge>}
                   </div>
                 )}
@@ -262,11 +229,6 @@ export function UsersTab() {
                       ) : (
                         <FaBan className="h-3.5 w-3.5 text-warning" />
                       )}
-                    </Button>
-                  )}
-                  {me?.id !== u.id && (
-                    <Button size="sm" variant="ghost" onClick={() => onTopup(u)} title="Top up wallet">
-                      <FaCoins className="h-3.5 w-3.5 text-accent" />
                     </Button>
                   )}
                   {me?.id !== u.id && (

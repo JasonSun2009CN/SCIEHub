@@ -1,5 +1,4 @@
 import type { Hono } from 'hono';
-import { CURRENCIES, type Currency } from '@sciehub/shared';
 import { requireAdmin } from '../auth.js';
 import {
   countAdmins,
@@ -8,22 +7,16 @@ import {
   deleteRepo,
   deleteUserWithFiles,
   getAdminOverview,
-  getOrderById,
   getRepoById,
   getUserById,
   listAdminUsers,
-  listAllOrders,
   listRepos,
   listReports,
-  refundOrder,
   setReportStatus,
   setUserAdmin,
-  setUserCanBuy,
   setUserCanChat,
   setUserCanPublishFree,
-  setUserCanPublishPaid,
   setUserSuspended,
-  topUpWallet,
 } from '../db.js';
 import { readJson } from '../http.js';
 import type { AppEnv } from '../types.js';
@@ -35,45 +28,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     await requireAdmin(c);
     const overview = await getAdminOverview();
     const recent = await listReports({ offset: 0, limit: 8 });
-    const orders = await listAllOrders({ offset: 0, limit: 5 });
     return c.json({
       ...overview,
       recentReports: recent.items,
-      recentOrders: orders.items,
     });
-  });
-
-  // ---- Orders ------------------------------------------------------------
-
-  app.get('/api/admin/orders', async (c) => {
-    await requireAdmin(c);
-    const limit = Math.min(Math.max(Number(c.req.query('limit')) || 20, 1), 100);
-    const offset = Math.max(Number(c.req.query('offset')) || 0, 0);
-    const rawStatus = c.req.query('status');
-    const status =
-      rawStatus === 'pending' ||
-      rawStatus === 'paid' ||
-      rawStatus === 'refunded' ||
-      rawStatus === 'cancelled'
-        ? rawStatus
-        : undefined;
-    return c.json(await listAllOrders({ status, offset, limit, search: c.req.query('search') }));
-  });
-
-  app.post('/api/admin/orders/:id/refund', async (c) => {
-    const admin = await requireAdmin(c);
-    const { id } = c.req.param();
-    const order = await getOrderById(id);
-    if (!order) return c.json({ error: 'Order not found' }, 404);
-    if (order.status !== 'paid') {
-      return c.json({ error: `Only paid orders can be refunded (current: ${order.status})` }, 400);
-    }
-    const body = await readJson<{ reason?: string }>(c);
-    const result = await refundOrder(id, admin.id, body.reason ?? 'Admin-initiated refund');
-    if (!result.success) {
-      return c.json({ error: result.error, code: result.code }, 400);
-    }
-    return c.json({ ok: true, order: result.order });
   });
 
   // ---- Reports -----------------------------------------------------------
@@ -113,9 +71,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     const body = await readJson<{
       isAdmin?: boolean;
       isSuspended?: boolean;
-      canBuy?: boolean;
       canPublishFree?: boolean;
-      canPublishPaid?: boolean;
       canChat?: boolean;
     }>(c);
     if (typeof body.isAdmin === 'boolean' && !body.isAdmin) {
@@ -126,27 +82,9 @@ export function registerAdminRoutes(app: Hono<AppEnv>): void {
     }
     if (typeof body.isAdmin === 'boolean') await setUserAdmin(id, body.isAdmin);
     if (typeof body.isSuspended === 'boolean') await setUserSuspended(id, body.isSuspended);
-    if (typeof body.canBuy === 'boolean') await setUserCanBuy(id, body.canBuy);
     if (typeof body.canPublishFree === 'boolean') await setUserCanPublishFree(id, body.canPublishFree);
-    if (typeof body.canPublishPaid === 'boolean') await setUserCanPublishPaid(id, body.canPublishPaid);
     if (typeof body.canChat === 'boolean') await setUserCanChat(id, body.canChat);
     return c.json({ ok: true });
-  });
-
-  app.post('/api/admin/users/:id/topup', async (c) => {
-    await requireAdmin(c);
-    const { id } = c.req.param();
-    if (!(await getUserById(id))) return c.json({ error: 'User not found' }, 404);
-    const body = await readJson<{ amount?: number; currency?: Currency }>(c);
-    const amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
-      return c.json({ error: 'amount must be > 0 and <= 1,000,000' }, 400);
-    }
-    const currency = (body.currency ?? 'CNY') as Currency;
-    if (!CURRENCIES.some((item) => item.code === currency)) {
-      return c.json({ error: 'Unsupported currency' }, 400);
-    }
-    return c.json(await topUpWallet(id, amount, currency));
   });
 
   app.delete('/api/admin/users/:id', async (c) => {

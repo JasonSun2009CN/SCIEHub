@@ -12,7 +12,7 @@ import { registerUserRoutes } from './routes/users.js';
 import { registerHomeRoutes } from './routes/home.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerCommunityRoutes } from './routes/community.js';
-import { registerRequestRoutes } from './routes/requests.js';
+import { registerPlazaRoutes } from './routes/plaza.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import type { AppEnv } from './types.js';
 
@@ -37,7 +37,7 @@ registerUserRoutes(app);
 registerHomeRoutes(app);
 registerReportRoutes(app);
 registerCommunityRoutes(app);
-registerRequestRoutes(app);
+registerPlazaRoutes(app);
 registerAdminRoutes(app);
 
 // Uploaded files are stored in R2 and served from /uploads/<key>.

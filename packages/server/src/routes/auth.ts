@@ -58,7 +58,7 @@ export function registerAuthRoutes(app: Hono<AppEnv>): void {
       return c.json(
         {
           error:
-            'Use your school email in the format s24427.sun@stu.scie.com.cn. External emails cannot register.',
+            'Use your school email in the format s12345.chen@stu.scie.com.cn. External emails cannot register.',
         },
         400,
       );

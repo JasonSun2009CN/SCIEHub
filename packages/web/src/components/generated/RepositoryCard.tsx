@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
   FaBook,
-  FaCheck,
   FaComment,
   FaDownload,
   FaEye,
@@ -11,7 +10,7 @@ import {
   FaTag,
   FaUserSecret,
 } from 'react-icons/fa';
-import { classificationLabel, formatBytes, formatPrice, type Repository } from '@sciehub/shared';
+import { classificationLabel, formatBytes, type Repository } from '@sciehub/shared';
 import { Badge } from '@/components/ui/badge';
 import { UserAvatar } from './UserAvatar';
 import { cn, formatNumber, timeAgo } from '@/lib/utils';
@@ -22,19 +21,11 @@ interface RepositoryCardProps {
   showGroups?: boolean;
 }
 
-function PriceBadge({ repo }: { repo: Repository }) {
-  if (repo.pricingType === 'free') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success-subtle px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-success">
-        <FaTag className="h-2.5 w-2.5" />
-        Free
-      </span>
-    );
-  }
+function FreeBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-warning/35 bg-warning-subtle px-2.5 py-1 text-[11px] font-bold tabular-nums text-warning">
+    <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success-subtle px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-success">
       <FaTag className="h-2.5 w-2.5" />
-      {formatPrice(repo.price, repo.currency)}
+      Free
     </span>
   );
 }
@@ -59,16 +50,6 @@ export function RepositoryCard({ repo, index = 0, showGroups = true }: Repositor
       )}
       style={{ animationDelay: `${index * 60}ms` }}
     >
-      {repo.isPurchased && (
-        <span
-          className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-success/40 bg-success-subtle px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-success shadow-sm"
-          title="You already own this resource"
-        >
-          <FaCheck className="h-2.5 w-2.5" />
-          Owned
-        </span>
-      )}
-
       {repo.previewImageUrl && (
         <Link
           to={`/repos/${repo.id}`}
@@ -95,7 +76,7 @@ export function RepositoryCard({ repo, index = 0, showGroups = true }: Repositor
                 {repo.name}
               </h3>
             </Link>
-            {!repo.isPurchased && <PriceBadge repo={repo} />}
+            <FreeBadge />
           </div>
           <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-muted-foreground">
             {repo.description || 'No description provided.'}
@@ -130,13 +111,7 @@ export function RepositoryCard({ repo, index = 0, showGroups = true }: Repositor
             </span>
           ))}
         <RatingRow repo={repo} />
-        {(repo.totalSales ?? 0) > 0 ? (
-          <span className="ml-auto text-[11px] font-semibold text-warning">
-            {repo.totalSales} sold
-          </span>
-        ) : (
-          <span className="ml-auto">{timeAgo(repo.createdAt)}</span>
-        )}
+        <span className="ml-auto">{timeAgo(repo.createdAt)}</span>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-xs text-muted-foreground">

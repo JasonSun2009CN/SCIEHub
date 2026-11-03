@@ -5,7 +5,6 @@ import {
   FaCog,
   FaComments,
   FaGraduationCap,
-  FaInbox,
   FaMoon,
   FaSearch,
   FaShieldAlt,
@@ -29,10 +28,9 @@ import { UserAvatar } from './UserAvatar';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { to: '/free', label: 'Free' },
-  { to: '/marketplace', label: 'Marketplace' },
+  { to: '/library', label: 'Library' },
   { to: '/community', label: 'Community' },
-  { to: '/paid', label: 'Paid' },
+  { to: '/plaza', label: 'Plaza' },
   { to: '/groups', label: 'Groups' },
   { to: '/leaderboard', label: 'Leaderboard' },
 ];
@@ -45,7 +43,7 @@ export function Header() {
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
-    navigate(query.trim() ? `/marketplace?q=${encodeURIComponent(query.trim())}` : '/marketplace');
+    navigate(query.trim() ? `/library?q=${encodeURIComponent(query.trim())}` : '/library');
   };
 
   return (
@@ -66,7 +64,7 @@ export function Header() {
             </span>
           </Link>
 
-          <form onSubmit={onSearch} className="relative hidden flex-1 max-w-sm lg:block" role="search">
+          <form onSubmit={onSearch} className="relative hidden flex-1 max-w-sm xl:block" role="search">
             <FaSearch
               className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
               aria-hidden
@@ -157,9 +155,7 @@ export function Header() {
                   <DropdownMenuItem onClick={() => navigate(`/users/${user.username}`)}>
                     <FaUserCircle className="h-4 w-4" /> Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/requests')}>
-                    <FaInbox className="h-4 w-4 text-accent" /> Purchase requests
-                  </DropdownMenuItem>
+
                   <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <FaCog className="h-4 w-4" /> Settings
                   </DropdownMenuItem>

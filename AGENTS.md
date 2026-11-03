@@ -36,22 +36,23 @@ npm run db:migrate:remote          # apply migrations to the real D1 database
 ## Database and money flow
 
 - Schema/migrations live in `packages/server/migrations/*.sql`; apply them with the `db:migrate:*` scripts. There is no ORM and no runtime schema creation.
-- D1 has no interactive transactions. Multi-statement writes use `db.batch()`; payment/refund invariants are enforced by triggers in `0001_init.sql` (`order_not_pending`, `insufficient_balance`, `order_already_refunded`). Preserve those guards.
+- D1 has no interactive transactions. Multi-statement writes use `db.batch()`. Legacy payment triggers from `0001_init.sql` remain in the schema for old data but are no longer reachable from the app.
 - Repository taxonomy is three-dimensional: `level_id` (IG / AS / A Level / IB / AP), `category_id` (subject), and `resource_type` (notes / practice / past-paper). Source lists are `LEVELS`, `CATEGORIES`, and `RESOURCE_TYPES` in `packages/shared/src/index.ts`; keep the DB columns, API validation, and UI selects in sync.
-- Product is **free-first**: `/free` is the main shelf, `/marketplace` shows all, `/paid` is optional. Free resources download directly; paid resources use contact requests, not on-site checkout.
-- `is_anonymous` on repos hides the publisher name. Anonymous publishing is allowed for free resources only; paid listings require a username for seller accountability.
-- Paid flow: `POST /repos/:id/purchase-request` creates a `purchase_requests` row with the buyer's account email. Sellers see it in `/requests`, then arrange payment/delivery off-platform. Internal checkout/pay endpoints intentionally return `410`.
+- Product is **free only**: `/library` is the single shelf and every resource downloads directly. `/marketplace` etc. redirect to `/library`; there is no checkout, wallet, order or purchase-request flow.
+- `is_anonymous` on repos hides the publisher name. Anonymous publishing is available for every resource.
+- `GET /api/files/:id/preview` serves PDFs/images inline for the in-browser preview dialog; downloads use `/api/files/:id/download`.
 - The Commons (`/community`) is a global `community_posts` board; users can post by username or anonymously. Admins can delete any post or block `canChat`.
-- Moderation is granular on `users`: `is_suspended` (ban all), `can_buy`, `can_publish_free`, `can_publish_paid`, `can_chat`. Enforce these in API routes, not only admin UI.
+- Plaza (`/plaza`) is the X-style campus wall: `plaza_posts` + `plaza_images` (R2) + `plaza_likes` + `plaza_comments`. Images only (JPG/PNG/WebP/GIF/AVIF, up to 4 per post, 10MB each); video is intentionally rejected. Posting/comments require `canChat`; admins can delete any post/comment.
+- Moderation is granular on `users`: `is_suspended` (ban all), `can_publish_free`, `can_chat`. Enforce these in API routes, not only admin UI. Legacy `can_buy` / `can_publish_paid` columns remain but are unused.
 - Uploaded files are written to R2 under UUID names; `files.file_path` is `/uploads/<key>`. Deleting a repo/file/user removes the corresponding R2 objects.
-- File downloads are gated by `owner || purchased || free || preview`; keep access checks in the API, not only the UI. A completed purchase request unlocks reviews but does not automatically unlock files — delivery is arranged with the seller.
+- All file downloads and inline previews are public; keep any future access checks in the API, not only the UI.
 
 ## Auth / config / deployment
 
 - Registration is restricted to school emails matching `s\d+\.<family>@stu.scie.com.cn` (`isValidSchoolEmail` in shared). Keep client and server validation in sync; login stays available for legacy accounts.
 - JWT bearer token is stored in `localStorage`. The Worker secret is `JWT_SECRET` (`wrangler secret put JWT_SECRET`); local dev falls back to a dev placeholder when unset.
 - The app does **not** load `.env`; use `.dev.vars` locally or Cloudflare secrets/vars. `.dev.vars` and `.wrangler/` are gitignored.
-- Common env: `JWT_SECRET`, `ADMIN_EMAILS`, `SCIEHUB_MAX_FILE_MB` (default 50), `SCIEHUB_MAX_FILES` (default 8), `SCIEHUB_ALLOW_SELF_TOPUP=1` (sandbox only).
+- Common env: `JWT_SECRET`, `ADMIN_EMAILS`, `SCIEHUB_MAX_FILE_MB` (default 50), `SCIEHUB_MAX_FILES` (default 8).
 - D1 binding `DB`, R2 binding `UPLOADS`, Assets binding `ASSETS`. `wrangler.jsonc` contains the deployed database ID and bucket name.
 - First registered account becomes admin. `ADMIN_EMAILS` auto-promotes those emails on register/login; admins can promote others from `/admin`.
 - Workers Assets use `not_found_handling: "single-page-application"`; `run_worker_first` sends `/api/*` and `/uploads/*` to the Worker. No custom Nginx/SPA fallback is needed.

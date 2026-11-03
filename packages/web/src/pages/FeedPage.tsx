@@ -6,7 +6,6 @@ import {
   CATEGORIES,
   LEVELS,
   RESOURCE_TYPES,
-  type MarketplaceZone,
   type Repository,
   type RepoListResult,
 } from '@sciehub/shared';
@@ -21,22 +20,14 @@ import { cn, formatNumber } from '@/lib/utils';
 
 const PAGE_SIZE = 12;
 
-const ZONE_TABS: { zone: MarketplaceZone; to: string; label: string }[] = [
-  { zone: 'free', to: '/free', label: 'Free' },
-  { zone: 'all', to: '/marketplace', label: 'All resources' },
-  { zone: 'paid', to: '/paid', label: 'Paid' },
-];
-
-export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
+export function FeedPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get('q') ?? '';
   const category = searchParams.get('category') ?? '';
   const level = searchParams.get('level') ?? '';
   const resourceType = searchParams.get('resourceType') ?? '';
   const sort = searchParams.get('sort') ?? 'recent';
-  const lockedPricing = zone === 'free' || zone === 'paid' ? zone : '';
-  const pricingType = lockedPricing || searchParams.get('pricingType') || '';
-  const paramsKey = JSON.stringify({ q, category, level, resourceType, sort, pricingType });
+  const paramsKey = JSON.stringify({ q, category, level, resourceType, sort });
 
   const [searchInput, setSearchInput] = useState(q);
   const [offset, setOffset] = useState(0);
@@ -55,7 +46,7 @@ export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
     queryKey: ['repos', paramsKey, offset],
     queryFn: () =>
       api<RepoListResult>(
-        `/repos?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&level=${encodeURIComponent(level)}&resourceType=${encodeURIComponent(resourceType)}&sort=${encodeURIComponent(sort)}&pricingType=${encodeURIComponent(pricingType)}&limit=${PAGE_SIZE}&offset=${offset}`,
+        `/repos?search=${encodeURIComponent(q)}&category=${encodeURIComponent(category)}&level=${encodeURIComponent(level)}&resourceType=${encodeURIComponent(resourceType)}&sort=${encodeURIComponent(sort)}&limit=${PAGE_SIZE}&offset=${offset}`,
       ),
   });
 
@@ -90,14 +81,9 @@ export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
     setParam('q', searchInput.trim());
   };
 
-  const pageTitle =
-    zone === 'free' ? 'Free resources' : zone === 'paid' ? 'Paid resources' : 'The study shelf';
+  const pageTitle = 'Resource library';
   const pageSubtitle =
-    zone === 'free'
-      ? 'The main shelf: notes, practice and past papers you can download without paying.'
-      : zone === 'paid'
-        ? 'Optional full packs. Request contact with the seller and arrange payment off-platform.'
-        : 'Free-first resources for IGCSE, AS/A Level, IB and AP — with optional paid packs.';
+    'Free notes, practice and past papers for IGCSE, AS/A Level, IB and AP. Everything downloads directly.';
 
   const activeFilters = [
     q ? { key: 'q', label: `Search: ${q}` } : null,
@@ -111,7 +97,6 @@ export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
           label: RESOURCE_TYPES.find((item) => item.id === resourceType)?.name ?? resourceType,
         }
       : null,
-    !lockedPricing && pricingType ? { key: 'pricingType', label: pricingType } : null,
     sort !== 'recent' ? { key: 'sort', label: 'Custom sort' } : null,
   ].filter(Boolean) as { key: string; label: string }[];
 
@@ -121,25 +106,9 @@ export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Study shelf</p>
+          <p className="eyebrow">Free study library</p>
           <h1 className="mt-1 font-display text-3xl sm:text-4xl">{pageTitle}</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{pageSubtitle}</p>
-        </div>
-        <div className="flex items-center gap-2 rounded-full border border-border/70 bg-surface/70 p-1">
-          {ZONE_TABS.map((tab) => (
-            <Link
-              key={tab.zone}
-              to={tab.to}
-              className={cn(
-                'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
-                zone === tab.zone
-                  ? 'bg-accent-subtle text-accent'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
         </div>
       </div>
 
@@ -205,21 +174,6 @@ export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
                 ))}
               </SelectContent>
             </Select>
-            {!lockedPricing && (
-              <Select
-                value={pricingType}
-                onValueChange={(v) => setParam('pricingType', v === 'all' ? '' : v)}
-              >
-                <SelectTrigger className="h-11 w-[7.5rem] rounded-full">
-                  <SelectValue placeholder="Pricing" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All pricing</SelectItem>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
             <Select value={sort} onValueChange={(v) => setParam('sort', v)}>
               <SelectTrigger className="h-11 w-[9.5rem] rounded-full">
                 <SelectValue placeholder="Sort" />
@@ -228,10 +182,7 @@ export function FeedPage({ zone = 'all' }: { zone?: MarketplaceZone }) {
                 <SelectItem value="recent">Newest</SelectItem>
                 <SelectItem value="popular">Most downloaded</SelectItem>
                 <SelectItem value="views">Most viewed</SelectItem>
-                <SelectItem value="sales">Best selling</SelectItem>
                 <SelectItem value="rating">Top rated</SelectItem>
-                <SelectItem value="price_asc">Price: low → high</SelectItem>
-                <SelectItem value="price_desc">Price: high → low</SelectItem>
               </SelectContent>
             </Select>
           </div>

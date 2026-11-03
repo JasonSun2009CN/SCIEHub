@@ -2,7 +2,7 @@
 
 A free-first **study-resource library and community** for international high school students (IGCSE · AS/A-Level · IB · AP).
 
-**Free first. Share, ask, Excel.** A **free-first** study-resource library and community for international high school students. Download free notes, practice and past papers, join **The Commons** to talk study, or publish your own work — under your username or anonymously. Optional paid packs are arranged directly with the seller.
+**Share, ask, excel.** A **free** study-resource library and community for international high school students. Download notes, practice and past papers, join **The Commons** to talk study, or publish your own work — under your username or anonymously. There is no marketplace, no checkout and no paid tier.
 
 ## Tech stack
 
@@ -17,31 +17,31 @@ A free-first **study-resource library and community** for international high sch
 
 ## Features
 
-### Free-first marketplace
-- **Free-first shelves** — `/free` is the main shelf; `/marketplace` shows everything and `/paid` is the optional paid shelf. Free resources download without checkout.
+### Free resource library
+- **Everything is free** — `/library` is the only shelf. Notes, practice and past papers download without checkout, payment or an account.
 - **Curriculum taxonomy** — resources are classified by level (**IGCSE / IG, AS, A Level, IB, AP**), subject (Math, English Literature, English Language, Physics, Biology, Computer Science, Chinese, History, Chemistry, Economics, Business, Psychology…), and resource type (**Notes, Practice Questions, Past Papers**).
-- **Anonymous or named publishing** — free resources can be published under your username or anonymously. Anonymous listings hide the publisher identity.
-- **Paid = contact request, not checkout** — a paid listing sends the seller a purchase request containing the buyer's account email. The seller arranges payment and delivery with the buyer on another platform; SCIEHub does not process the transaction.
-- **Reviews** — owners of free resources and buyers whose request was completed can rate a repository 1–5 stars.
-- **Leaderboard** — `/leaderboard` has two views: **Top contributors** (by files shared) and **Top sellers** (by sales + revenue).
+- **Anonymous or named publishing** — every resource can be published under your username or anonymously. Anonymous listings hide the publisher identity.
+- **In-browser preview** — PDFs and images can be previewed in a dialog before downloading.
+- **Reviews** — any signed-in student can rate a repository 1–5 stars and leave a comment.
+- **Leaderboard** — `/leaderboard` ranks the **top contributors** by files shared and total size.
 
 ### Community & sharing
 - **The Commons** — `/community` is a shared public board where every signed-in user can post questions, tips and resource requests, anonymously or by username. Posts refresh automatically.
+- **Plaza (campus wall)** — `/plaza` is an X-style photo/text wall: up to 4 images per post, likes, comments, anonymous posting, and admin/owner deletion. Images only — video uploads are intentionally disabled.
 - **Repositories** — users create repos (name, description, level, subject, resource type, tags) and upload multiple files into them. Owners can edit metadata/tags, delete a wrong file, and re-upload a replacement.
-- **Feed & search** — browse by level, subject, resource type, price, rating and full-text search.
+- **Library & search** — browse by level, subject, resource type, rating and full-text search.
 - **Study groups** — join groups by **requesting membership**; the group creator approves or rejects each request. Groups collect repositories shared into them.
 - **Sharing** — a repo owner can share a repository into any group they belong to (and remove it again).
 - **Community guidelines** — `/conduct` sets the rules; **Report** buttons on every repository and comment store reports for review.
-- **School email only** — registration requires a school address in the format `s24427.sun@stu.scie.com.cn` (`s` + student ID + `.` + family name + fixed domain). External emails are rejected to keep the community inside the school.
+- **School email only** — registration requires a school address in the format `s12345.chen@stu.scie.com.cn` (`s` + student ID + `.` + family name + fixed domain). External emails are rejected to keep the community inside the school.
 - **Account safety** — every sign-in is logged (IP + browser); users can review their login history, **sign out all devices**, **deactivate** their account (deleted after 30 days unless they sign back in) or **permanently delete** it with their password.
 - **Comments & favorites** per repository, per-file download counters, drag-and-drop multi-file uploads with progress.
 - **Dark/light themes** (dark default) driven by CSS-variable tokens.
 
 ### Admin
-- **Admin console** — `/admin` shows site stats, reports, orders, repositories and users.
+- **Admin console** — `/admin` shows site stats, reports, repositories and users.
 - **Moderation** — ban all features, delete users, and remove repositories, files, comments or community posts.
-- **Granular permissions** — independently allow or block **buying paid resources**, **publishing free content**, **publishing paid content**, and **posting in the community**.
-- **Legacy wallet tools** — admins can still top up wallets and refund legacy orders for older data.
+- **Granular permissions** — independently allow or block **publishing free content** and **posting in the community**.
 
 ## Getting started (development)
 
@@ -101,7 +101,6 @@ Fresh installs contain **no demo data**. Register an account at `/auth` and it w
 | `ADMIN_EMAILS` | empty | Optional: comma-separated emails that get **admin** on register/login (overrides the first-user rule) |
 | `SCIEHUB_MAX_FILE_MB` | `50` | Max size per uploaded file |
 | `SCIEHUB_MAX_FILES` | `8` | Max files per upload request |
-| `SCIEHUB_ALLOW_SELF_TOPUP` | unset | Set to `1` only for sandbox self top-ups |
 
 Cloudflare bindings (configured in `wrangler.jsonc`): `DB` (D1), `UPLOADS` (R2), `ASSETS` (Workers Assets). The app does not read `.env`; use `.dev.vars` locally and Worker secrets/vars in production.
 
@@ -120,35 +119,33 @@ wrangler.jsonc  # Worker entry, D1/R2/Assets bindings, SPA fallback, cron
 
 | Route | Page |
 | --- | --- |
-| `/` | Home — free-first hero, free shelf, trending, top sellers, community, groups |
-| `/marketplace` (alias `/feed`) | Browse/search resources with level, subject, resource-type and pricing filters |
-| `/free` | Free resources only (main shelf) |
-| `/paid` | Optional paid resources — contact-based requests |
-| `/repos/:id` | Repository detail — files, free download or purchase request, reviews, comments, share |
+| `/` | Home — free library hero, free shelf, trending, community, groups |
+| `/library` (aliases `/feed`, `/marketplace`, `/free`, `/paid`) | Browse/search resources by level, subject and resource type |
+| `/repos/:id` | Repository detail — files, inline preview, free download, reviews, comments, share |
 | `/community` | The Commons — shared community board (username or anonymous) |
-| `/requests` | Purchase requests — incoming buyer emails and sent requests |
-| `/upload` | Create a repository / choose free or paid / publish anonymously / add files |
+| `/plaza` | Plaza — campus wall with text + image posts, likes and comments |
+| `/upload` | Create a repository / publish anonymously / add files |
 | `/groups` | Group directory + create-group dialog |
 | `/groups/:id` | Group detail — repositories / members (+ join requests) / settings (creator) |
-| `/users/:username` | Public profile — repositories / favorites / purchases / groups |
-| `/leaderboard` | Top contributors and top sellers (sales + revenue) |
+| `/users/:username` | Public profile — repositories / favorites / groups |
+| `/leaderboard` | Top contributors by files shared |
 | `/conduct` | Community guidelines |
 | `/contributing` | Contribute — send suggestions, report issues, open PRs |
-| `/admin` | Admin console (admins only) — overview, orders, reports, users, repos |
+| `/admin` | Admin console (admins only) — overview, reports, users, repos |
 | `/settings` | Profile, avatar, notification prefs, password |
 | `/auth` | Sign in / register |
 
 ## User manual
 
-A plain-language guide for readers, publishers and sellers lives in [`docs/USER_MANUAL.md`](./docs/USER_MANUAL.md) — how to publish, request paid resources, use the community and review.
+A plain-language guide for readers and publishers lives in [`docs/USER_MANUAL.md`](./docs/USER_MANUAL.md) — how to publish, preview files, use the community and review.
 
 ## Notes
 
 - Joining a group creates a **join request**; the group creator (admin) approves/rejects it. Admins cannot leave — they delete the group instead.
-- **Free first** — free resources download directly. Publishing anonymously is available for free resources; paid listings require a username for seller accountability.
-- **Paid resources** — no on-site checkout. A buyer sends a purchase request; the seller sees the buyer's account email in `/requests` and arranges payment and delivery on another platform. SCIEHub does not hold or transfer money for these exchanges.
+- **Free only** — every resource downloads directly, and publishing can be anonymous or under a username.
+- **Original work** — only upload material you own or have permission to share. If your own notes were uploaded by someone else without permission, contact the administrator for removal.
 - **The Commons** — every signed-in user can post. Admins can block a user's community posting independently of other permissions, and can delete any post.
-- **Reviews** — owners of free resources and buyers whose request was completed can review. Reviews can be edited or deleted by their author.
+- **Reviews** — any signed-in student can review. Reviews can be edited or deleted by their author.
 - Reports are triaged in `/admin` → Reports.
 - **Email registered without your permission?** If you find your email is already taken on the sign-up page, use that email to write to `jasonsun2009@yeah.net` — the sign-up form includes a ready-made "claim" email link. Never create an account on an email you don't own. Forgot your password? The sign-in form has a "contact the admin to reset it" link to the same address.
 - **Admins** can open `/admin` from their account menu. The **first registered user** on a fresh install becomes the site admin — no default password exists anywhere in the code. Emails in `ADMIN_EMAILS` are auto-promoted on register/login, and existing admins can promote others from the Users tab. Admins can **add other admins** and **step down** (transfer) their own admin role — the last admin is protected from being removed. Tip: register your owner account first so no stranger grabs admin on a public server.

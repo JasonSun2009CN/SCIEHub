@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FaBan, FaBook, FaCoins, FaCopyright, FaFlag, FaHeart, FaShieldAlt, FaStar, FaUserSlash } from 'react-icons/fa';
+import { FaBan, FaBook, FaCopyright, FaFlag, FaHeart, FaShieldAlt, FaStar, FaUserSlash } from 'react-icons/fa';
 import { PageMeta } from '@/components/common/PageMeta';
 
 const RULES = [
@@ -28,16 +28,16 @@ const RULES = [
       'Keep repositories genuine. No clickbait titles, scams, self-promotion, or material that doesn’t match its description.',
   },
   {
-    Icon: FaCoins,
-    title: 'Fair pricing',
+    Icon: FaBook,
+    title: 'Free for everyone',
     description:
-      'Price paid resources honestly and deliver exactly what the description promises. Overpriced, bait-and-switch or fake listings are treated as violations.',
+      'Everything on SCIEHub is free to download. Never ask another student to pay for access to files shared here.',
   },
   {
     Icon: FaStar,
-    title: 'Honest reviews & refunds',
+    title: 'Honest reviews',
     description:
-      'Review only resources you actually bought, and review honestly. Sellers can refund a paid order to make things right; buyers should reach out before escalating a report.',
+      'Review resources you have actually used, and review honestly. Constructive feedback helps the next student.',
   },
   {
     Icon: FaShieldAlt,
@@ -83,17 +83,16 @@ export function ConductPage() {
 
       <div className="mt-8 rounded-2xl border border-border/75 bg-surface/75 shadow-soft p-6">
         <h2 className="flex items-center gap-2 font-semibold">
-          <FaBook className="h-4 w-4 text-accent" /> One more thing about files & trading
+          <FaBook className="h-4 w-4 text-accent" /> Sharing and takedowns
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Files you upload are visible to everyone who can access your repository. Be thoughtful about what you share and
-          who it could help (or harm). Downloads are tracked, and paid resources stay locked until a buyer pays — then
-          the buyer keeps access and the seller earns 90% of the price (10% platform fee). Buyers can review what they
-          purchased, and sellers can issue refunds when something is wrong.
+          Files you upload are visible to everyone. Only publish your own notes or material you have permission to
+          share. If your own notes were uploaded by someone else without your permission, contact the administrator
+          with the repository link and it will be removed.
         </p>
         <div className="mt-4 flex flex-wrap gap-4">
-          <Link to="/marketplace" className="text-accent hover:underline">Browse the marketplace →</Link>
-          <Link to="/upload" className="text-accent hover:underline">Upload & sell a resource →</Link>
+          <Link to="/library" className="text-accent hover:underline">Browse the library →</Link>
+          <Link to="/upload" className="text-accent hover:underline">Publish a resource →</Link>
         </div>
       </div>
 

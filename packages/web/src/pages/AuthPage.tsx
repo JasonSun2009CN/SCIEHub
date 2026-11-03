@@ -149,7 +149,7 @@ export function AuthPage() {
     setEmailTaken(false);
     if (!isValidSchoolEmail(regEmail)) {
       setError(
-        'Use your school email in the format s24427.sun@stu.scie.com.cn. External emails cannot register.',
+        'Use your school email in the format s12345.chen@stu.scie.com.cn. External emails cannot register.',
       );
       return;
     }
@@ -245,7 +245,7 @@ export function AuthPage() {
                     type="email"
                     value={loginEmail}
                     onChange={setLoginEmail}
-                    placeholder="s24427.sun@stu.scie.com.cn"
+                    placeholder="s12345.chen@stu.scie.com.cn"
                     autoComplete="email"
                   />
                   <Field
@@ -301,7 +301,7 @@ export function AuthPage() {
                     type="email"
                     value={regEmail}
                     onChange={setRegEmail}
-                    placeholder="s24427.sun@stu.scie.com.cn"
+                    placeholder="s12345.chen@stu.scie.com.cn"
                     autoComplete="email"
                   />
                   <p className="-mt-2 text-[11px] leading-5 text-muted-foreground">
